@@ -1,10 +1,9 @@
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger";
 import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
+import { APPROVED_UNITS } from "@/config/units";
 
 const MAX_PLAYERS = 115;
-
-let lastHash = "";
 
 let peakOnlineToday = 0;
 let peakResetDate = new Date().toDateString();
@@ -39,17 +38,16 @@ export async function StartMonitorUpdater(client: Client) {
             embeds: createEmbeds(players),
         });
 
-        lastHash = buildHash(players);
-
         sendLog("INFO", "Monitor", `Создан новый мониторинг онлайна: ${message.id}`);
     }
 
-    // Установка текущего хэша
-    const initialPlayers = await getOnlinePlayers();
-    lastHash = buildHash(initialPlayers);
+    let isUpdating = false;
 
     // Основной цикл обновления мониторинга
     setInterval(async () => {
+        if (isUpdating) return;
+        isUpdating = true;
+
         try {
             const players = await getOnlinePlayers();
 
@@ -62,6 +60,8 @@ export async function StartMonitorUpdater(client: Client) {
                 type: ActivityType.Watching
             });
 
+            if (!message) return;
+
             const today = new Date().toDateString();
 
             if (today !== peakResetDate) {
@@ -72,36 +72,21 @@ export async function StartMonitorUpdater(client: Client) {
             if (players.length > peakOnlineToday) {
                 peakOnlineToday = players.length;
             }
-
-            const currentHash = buildHash(players);
-
-            if (currentHash !== lastHash) {
-                lastHash = currentHash;
-            }
-
+            
             await message.edit({
                 embeds: createEmbeds(players),
             });
 
         } catch (err) {
             console.error(err);
+        } finally {
+            isUpdating = false;
         }
     }, 30_000);
 }
 
 function isValidId(id: string | undefined): id is string {
     return !!id && id.length > 10;
-}
-
-// Создание Hash текущего списка игроков
-function buildHash(players: OnlinePlayer[]): string {
-    return JSON.stringify(
-        players.map(p => ({
-            name: p.pName,
-            rank: p.pLvlSort,
-            slot: p.Slot
-        }))
-    );
 }
 
 // Цвет статуса Embed
@@ -158,6 +143,73 @@ function getSlotStats(players: OnlinePlayer[]) {
         .sort((a, b) => b[1] - a[1]);
 }
 
+// Получение отряда
+function getPlayerUnit(name: string): string | null {
+    const match = name.match(/^\[(.+?)\]/);
+
+    if (!match?.[1]) {
+        return null;
+    }
+
+    const unit = match[1].trim();
+
+    return APPROVED_UNITS.has(unit)
+        ? unit
+        : null;
+}
+
+// Получение списка отрядов
+function getUnitStats(players: OnlinePlayer[]) {
+
+    const units = new Map<string, number>();
+
+    for (const player of players) {
+
+        const unit = getPlayerUnit(player.pName);
+
+        if (!unit)
+            continue;
+
+        units.set(
+            unit,
+            (units.get(unit) || 0) + 1
+        );
+    }
+
+    return [...units.entries()]
+        .sort((a, b) => b[1] - a[1]);
+}
+
+// Нормализация длинны списков
+function normalizeColumns(left: string[], right: string[]) {
+    const max = Math.max(left.length, right.length);
+
+    const l = [...left];
+    const r = [...right];
+
+    while (l.length < max) l.push(" ");
+    while (r.length < max) r.push(" ");
+
+    return { l, r };
+}
+
+// Создание Progress Bar
+function createProgressBar(
+    current: number,
+    max: number
+) {
+    const size = 20;
+
+    const filled = Math.round(
+        current / max * size
+    );
+
+    return (
+        "█".repeat(filled) +
+        "░".repeat(size - filled)
+    );
+}
+
 // Главная функция генерации Embed
 function createEmbeds(players: OnlinePlayer[]): EmbedBuilder[] {
     players.sort(
@@ -178,10 +230,6 @@ function createEmbeds(players: OnlinePlayer[]): EmbedBuilder[] {
 function createHeaderEmbed(online: number, color: number): EmbedBuilder {
     const unix = Math.floor(Date.now() / 1000);
 
-    const load = Math.round(
-        (online / MAX_PLAYERS) * 100
-    );
-
     return new EmbedBuilder()
         .setColor(color)
         .setTitle("🌐 «Спектр Войны» Мониторинг Онлайна")
@@ -190,9 +238,9 @@ function createHeaderEmbed(online: number, color: number): EmbedBuilder {
                 "```yaml",
                 `STATUS      | ${getStatusText(online)}`,
                 `ONLINE      | ${online}/${MAX_PLAYERS}`,
-                `LOAD        | ${load}%`,
                 `PEAK TODAY  | ${peakOnlineToday}`,
                 `SERVER      | ${process.env.SERVER_IP}:${process.env.SERVER_PORT}`,
+                `LOAD        | ${createProgressBar(online, MAX_PLAYERS)}`,
                 "```",
                 "",
                 `🕒 Обновлено: <t:${unix}:R>`
@@ -204,18 +252,33 @@ function createHeaderEmbed(online: number, color: number): EmbedBuilder {
 }
 
 function createSlotsEmbed(players: OnlinePlayer[], color: number): EmbedBuilder {
-    const slotsText = getSlotStats(players)
+    const slots = getSlotStats(players)
         .slice(0, 15)
         .map(([slot, count]) =>
             `${String(count).padStart(2)} │ ${slot}`
-        )
-        .join("\n");
+        );
+
+    const units = getUnitStats(players)
+        .map(([unit, count]) =>
+            `${String(count).padStart(2)} │ ${unit}`
+        );
+
+    const { l: slotsCol, r: unitsCol } = normalizeColumns(slots, units);
 
     return new EmbedBuilder()
         .setColor(color)
-        .setTitle("⚙️ Текущие слоты")
-        .setDescription(
-            `\`\`\`\n${slotsText || "Нет данных"}\n\`\`\``
+        .setTitle("⚙️ Статистика подразделений")
+        .addFields(
+            {
+                name: "🎯 Слоты",
+                value: `\`\`\`\n${slotsCol.join("\n")}\n\`\`\``,
+                inline: true
+            },
+            {
+                name: "🪖 Отряды",
+                value: `\`\`\`\n${unitsCol.join("\n")}\n\`\`\``,
+                inline: true
+            }
         );
 }
 
