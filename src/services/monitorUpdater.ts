@@ -2,11 +2,9 @@
 
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger";
-import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
+import { getOnlinePlayers, OnlinePlayer, getCurrentZbd, ZBDInfo } from "@/database/queries";
 import { APPROVED_UNITS } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
-
-const MAX_PLAYERS = 115;
 
 // Пик онлайна за день
 let peakOnlineToday = 0;
@@ -37,9 +35,10 @@ export async function StartMonitorUpdater(client: Client) {
     // Если нет сообщения - создание нового
     if (!message) {
         const players = await getOnlinePlayers();
+        const zbd = await getCurrentZbd();
 
         message = await textChannel.send({
-            embeds: createEmbeds(players),
+            embeds: createEmbeds(players, zbd),
         });
 
         sendLog("INFO", "Monitor", `Создан новый мониторинг онлайна: ${message.id}`);
@@ -53,8 +52,9 @@ export async function StartMonitorUpdater(client: Client) {
         isUpdating = true;
 
         try {
-            // Получение актуального списка игроков
+            // Получение актуального списка игроков и текущего ЗБД
             const players = await getOnlinePlayers();
+            const zbd = await getCurrentZbd();
 
             // Обновление статуса бота
             const status =
@@ -82,7 +82,7 @@ export async function StartMonitorUpdater(client: Client) {
             
             // Обновление Embed сообщения
             await message.edit({
-                embeds: createEmbeds(players),
+                embeds: createEmbeds(players, zbd),
             });
 
         } catch (err) {
@@ -233,8 +233,16 @@ function createProgressBar(
     );
 }
 
+function formatTime(seconds: number) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+
+    return `${h}ч ${m}м ${s}с`;
+}
+
 // Сбор всех Embed`ов
-function createEmbeds(players: OnlinePlayer[]): EmbedBuilder[] {
+function createEmbeds(players: OnlinePlayer[], zbd: ZBDInfo | null): EmbedBuilder[] {
     players.sort(
         (a, b) => b.pLvlSort - a.pLvlSort
     );
@@ -243,15 +251,20 @@ function createEmbeds(players: OnlinePlayer[]): EmbedBuilder[] {
     const color = getStatusColor(online);
 
     return [
-        createHeaderEmbed(online, color),
+        createHeaderEmbed(online, zbd, color),
         createSlotsEmbed(players, color),
         ...createPlayerEmbeds(players, color)
     ];
 }
 
 // Шапка мониторинга (общая информация)
-function createHeaderEmbed(online: number, color: number): EmbedBuilder {
+function createHeaderEmbed(online: number, zbd: ZBDInfo | null, color: number): EmbedBuilder {
     const unix = Math.floor(Date.now() / 1000);
+
+    const zbdTime = zbd ? formatTime(zbd.Time) : "—";
+
+    const zbdCity = zbd?.City ?? "—";
+    
 
     return new EmbedBuilder()
         .setColor(color)
@@ -259,11 +272,15 @@ function createHeaderEmbed(online: number, color: number): EmbedBuilder {
         .setDescription(
             [
                 "```yaml",
-                `STATUS      | ${getStatusText(online)}`,
-                `ONLINE      | ${online}/${MAX_PLAYERS}`,
-                `PEAK TODAY  | ${peakOnlineToday}`,
-                `SERVER      | ${process.env.SERVER_IP}:${process.env.SERVER_PORT}`,
-                `LOAD        | ${createProgressBar(online, MAX_PLAYERS)}`,
+                `СТАТУС         | ${getStatusText(online)}`,
+                `ОНЛАЙН         | ${online}/${zbd?.MaxPlayers ?? 0}`,
+                `ПИК ЗА СУТКИ   | ${peakOnlineToday}`,
+                `СЕРВЕР         | ${process.env.SERVER_IP}:${process.env.SERVER_PORT}`,
+                `НАГРУЗКА       | ${createProgressBar(online, zbd?.MaxPlayers ?? 0)}`,
+                `               |`,
+                `ГОРОД          | ${zbdCity}`,
+                `ВРЕМЯ БД       | ${zbdTime}`,
+                `FPS СЕРВЕРА    | ${zbd?.FPS ?? "—"}`,
                 "```",
                 "",
                 `🕒 Обновлено: <t:${unix}:R>`
