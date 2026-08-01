@@ -53,6 +53,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             .setEmoji('❌')
     );
 
+    // Публичный ответ в чат (ephemeral: false)
     const responseMessage = await interaction.reply({
         embeds: [confirmEmbed],
         components: [row],
@@ -78,13 +79,14 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         if (i.customId === 'confirm_sync') {
             collector.stop('confirmed');
 
-            // Отключаем кнопки после нажатия
+            // Отключаем кнопки и чистим embed для плавного перехода
             const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 row.components.map(button => button.setDisabled(true))
             );
 
             await i.update({
-                content: '🚀 **Запуск массовой синхронизации...**',
+                content: '🚀 **Инициализация процесса...**',
+                embeds: [],
                 components: [disabledRow]
             });
 
@@ -99,6 +101,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
                 .setColor('#e74c3c');
 
             await i.update({
+                content: null,
                 embeds: [cancelEmbed],
                 components: []
             });
@@ -114,6 +117,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
                 .setColor('#95a5a6');
 
             await interaction.editReply({
+                content: null,
                 embeds: [timeoutEmbed],
                 components: []
             }).catch(() => {});

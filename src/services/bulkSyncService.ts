@@ -5,21 +5,23 @@ import { sendLog } from '@/utils/logger';
 
 export async function runBulkSync(guild: any, interaction: any) {
     const startTime = Date.now();
-    
-    // 1. Первичная задержка ответа
-    await interaction.deferReply({ ephemeral: false });
 
-    // 2. Сбор кэша гильдии (1 вызов вместо 6500)
+    // 1. Первичный статус (Сбрасываем кнопки и контент)
     const initialEmbed = new EmbedBuilder()
         .setTitle('🔄 Запуск массовой синхронизации ролей...')
         .setDescription('📡 Подгрузка кэша пользователей Discord и базы данных...')
         .setColor('#e67e22');
 
-    await interaction.editReply({ embeds: [initialEmbed] });
+    await interaction.editReply({ 
+        content: null, 
+        embeds: [initialEmbed], 
+        components: [] 
+    });
 
+    // 2. Сбор кэша участников сервера (1 вызов к API)
     await guild.members.fetch();
 
-    // 3. Получение всех игроков из БД за 1 SQL запрос
+    // 3. Получение всех привязанных пользователей из БД (1 SQL запрос)
     const players = await findAllSyncablePlayers();
     const totalPlayers = players.length;
 
@@ -29,7 +31,7 @@ export async function runBulkSync(guild: any, interaction: any) {
     let errors = 0;
 
     const CHUNK_SIZE = 15;      // Пачки по 15 участников
-    const DELAY_MS = 500;       // Задержка полсекунды между пачками
+    const DELAY_MS = 500;       // Пауза 0.5с между пачками
 
     let lastUpdateUI = Date.now();
 
@@ -41,7 +43,6 @@ export async function runBulkSync(guild: any, interaction: any) {
                 const cachedMember = player.DiscID ? guild.members.cache.get(player.DiscID) : null;
                 
                 if (!cachedMember) {
-                    processed++;
                     return;
                 }
 
@@ -55,7 +56,7 @@ export async function runBulkSync(guild: any, interaction: any) {
             }
         }));
 
-        // Обновление прогресса UI каждые 3 секунды
+        // Обновление прогресса каждые 3 секунды или в самом конце
         if (Date.now() - lastUpdateUI > 3000 || processed === totalPlayers) {
             lastUpdateUI = Date.now();
             const percent = Math.round((processed / totalPlayers) * 100);
@@ -72,7 +73,7 @@ export async function runBulkSync(guild: any, interaction: any) {
                     { name: 'Успешно никнеймов', value: `🏷️ ${namesUpdated}`, inline: true },
                     { name: 'Пропуски / Ошибки', value: `⚠️ ${errors}`, inline: true }
                 )
-                .setFooter({ text: 'Процесс идет в фоновом режиме, бот не завис.' });
+                .setFooter({ text: 'Процесс идет в фоновом режиме, бот работает штатно.' });
 
             await interaction.editReply({ embeds: [progressEmbed] });
         }
