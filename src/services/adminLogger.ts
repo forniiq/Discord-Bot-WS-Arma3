@@ -9,9 +9,13 @@ export function setupAdminLogging(client: Client) {
         if (message.partial || !message.guild || message.author?.bot) return;
 
         const auditEntry = await getExecutor(message.guild, AuditLogEvent.MessageDelete, message.author.id);
-        const executor = (auditEntry && auditEntry.extra.channel.id === message.channel.id)
-            ? auditEntry.executor
-            : message.author;
+        const executor =
+            auditEntry &&
+            auditEntry.extra &&
+            'channel' in auditEntry.extra &&
+            auditEntry.extra.channel?.id === message.channel.id
+                ? auditEntry.executor
+                : message.author;
 
         const content = message.content || '*[Содержимое недоступно / Вложение]*';
 
