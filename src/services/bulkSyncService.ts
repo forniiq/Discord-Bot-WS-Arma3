@@ -1,15 +1,15 @@
 import { EmbedBuilder } from 'discord.js';
 import { findAllSyncablePlayers } from '@/database/queries';
 import { syncPlayerProfile } from '@/services/playerSyncService';
-import { sendLog } from '@/utils/logger';
+import { sendLog } from '@/utils/logger'; 
 
 export async function runBulkSync(guild: any, interaction: any) {
     const startTime = Date.now();
 
-    // 1. Первичный статус (Сбрасываем кнопки и контент)
+    // 1. Первичный статус
     const initialEmbed = new EmbedBuilder()
-        .setTitle('🔄 Запуск массовой синхронизации ролей...')
-        .setDescription('📡 Подгрузка кэша пользователей Discord и базы данных...')
+        .setTitle('🔄 Запуск массовой синхронизации...')
+        .setDescription('📡 Загрузка кэша участников сервера и записей из БД...')
         .setColor('#e67e22');
 
     await interaction.editReply({ 
@@ -18,20 +18,33 @@ export async function runBulkSync(guild: any, interaction: any) {
         components: [] 
     });
 
-    // 2. Сбор кэша участников сервера (1 вызов к API)
-    await guild.members.fetch();
+    // 2. Получение данных
+    try {
+        await guild.members.fetch();
+    } catch (err) {
+        console.error('Ошибка кэширования гильдии:', err);
+    }
 
-    // 3. Получение всех привязанных пользователей из БД (1 SQL запрос)
     const players = await findAllSyncablePlayers();
     const totalPlayers = players.length;
+
+    if (totalPlayers === 0) {
+        const noDataEmbed = new EmbedBuilder()
+            .setTitle('⚠️ Синхронизация не требуется')
+            .setDescription('В базе данных не найдено привязанных участников для синхронизации.')
+            .setColor('#f1c40f');
+
+        return void interaction.editReply({ embeds: [noDataEmbed] });
+    }
 
     let processed = 0;
     let rolesUpdated = 0;
     let namesUpdated = 0;
     let errors = 0;
+    let skipped = 0;
 
-    const CHUNK_SIZE = 15;      // Пачки по 15 участников
-    const DELAY_MS = 500;       // Пауза 0.5с между пачками
+    const CHUNK_SIZE = 5;
+    const DELAY_MS = 300;
 
     let lastUpdateUI = Date.now();
 
@@ -43,12 +56,14 @@ export async function runBulkSync(guild: any, interaction: any) {
                 const cachedMember = player.DiscID ? guild.members.cache.get(player.DiscID) : null;
                 
                 if (!cachedMember) {
+                    skipped++;
                     return;
                 }
 
                 const res = await syncPlayerProfile(guild, player, cachedMember);
                 if (res.roleSuccess) rolesUpdated++;
                 if (res.nameSuccess) namesUpdated++;
+                if (!res.roleSuccess && !res.nameSuccess) skipped++;
             } catch (err) {
                 errors++;
             } finally {
@@ -56,7 +71,6 @@ export async function runBulkSync(guild: any, interaction: any) {
             }
         }));
 
-        // Обновление прогресса каждые 3 секунды или в самом конце
         if (Date.now() - lastUpdateUI > 3000 || processed === totalPlayers) {
             lastUpdateUI = Date.now();
             const percent = Math.round((processed / totalPlayers) * 100);
@@ -65,17 +79,18 @@ export async function runBulkSync(guild: any, interaction: any) {
             const progressBar = '█'.repeat(filled) + '░'.repeat(20 - filled);
 
             const progressEmbed = new EmbedBuilder()
-                .setTitle('⚙️ Выполняется синхронизация...')
+                .setTitle('⚙️ Выполняется массовая синхронизация...')
                 .setColor('#3498db')
                 .addFields(
                     { name: 'Прогресс', value: `\`[${progressBar}]\` **${percent}%** (${processed}/${totalPlayers})` },
-                    { name: 'Успешно ролей', value: `✅ ${rolesUpdated}`, inline: true },
-                    { name: 'Успешно никнеймов', value: `🏷️ ${namesUpdated}`, inline: true },
-                    { name: 'Пропуски / Ошибки', value: `⚠️ ${errors}`, inline: true }
+                    { name: 'Изменено ролей', value: `✅ \`${rolesUpdated}\``, inline: true },
+                    { name: 'Изменено ников', value: `🏷️ \`${namesUpdated}\``, inline: true },
+                    { name: 'Без изменений / Пропущено', value: `⏭️ \`${skipped}\``, inline: true },
+                    { name: 'Ошибки API', value: `⚠️ \`${errors}\``, inline: true }
                 )
-                .setFooter({ text: 'Процесс идет в фоновом режиме, бот работает штатно.' });
+                .setFooter({ text: 'Синхронизация выполняется в фоновом режиме...' });
 
-            await interaction.editReply({ embeds: [progressEmbed] });
+            await interaction.editReply({ embeds: [progressEmbed] }).catch(() => {});
         }
 
         if (i + CHUNK_SIZE < totalPlayers) {
@@ -85,18 +100,30 @@ export async function runBulkSync(guild: any, interaction: any) {
 
     const durationSeconds = Math.round((Date.now() - startTime) / 1000);
 
-    // 4. Финальный отчет
+    // 3. Финальный ответ в чат
     const finalEmbed = new EmbedBuilder()
         .setTitle('✅ Массовая синхронизация завершена!')
         .setColor('#2ecc71')
+        .setDescription(`Операция успешно завершена по инициативе ${interaction.user}.`)
         .addFields(
-            { name: 'Всего обработано из БД', value: `\`${totalPlayers}\``, inline: true },
+            { name: 'Всего обработано', value: `\`${totalPlayers}\``, inline: true },
             { name: 'Обновлено ролей', value: `\`${rolesUpdated}\``, inline: true },
             { name: 'Обновлено ников', value: `\`${namesUpdated}\``, inline: true },
-            { name: 'Затраченное время', value: `⏱️ **${durationSeconds} сек.**`, inline: true }
+            { name: 'Без изменений / Пропущены', value: `\`${skipped}\``, inline: true },
+            { name: 'Ошибки', value: `\`${errors}\``, inline: true },
+            { name: 'Время выполнения', value: `⏱️ **${durationSeconds} сек.**`, inline: true }
         )
         .setTimestamp();
 
-    await sendLog('INFO', 'BulkSync', `Администратор \`${interaction.user.tag}\` выполнил синхронизацию ${totalPlayers} участников за ${durationSeconds}сек.`);
-    await interaction.editReply({ embeds: [finalEmbed] });
+    await interaction.editReply({ 
+        content: `🔔 ${interaction.user}, массовая синхронизация завершена!`, 
+        embeds: [finalEmbed] 
+    });
+
+    // 4. Отправка записи в логи
+    await sendLog(
+        'INFO', 
+        'BulkSync', 
+        `Администратор \`${interaction.user.tag}\` (${interaction.user.id}) выполнил массовую синхронизацию (${totalPlayers} игроков) за ${durationSeconds} сек.`
+    );
 }

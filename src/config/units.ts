@@ -1,18 +1,15 @@
 // Отряды
 
-export const APPROVED_UNITS = new Set([
-    "LEG",
-    "ОСН ТАЙФУН",
-    "ДШРГ РУСИЧ",
-    "УСН ФСО",
-    "ЧВК Bear",
-    "Спарта",
-    "G4S",
-    "ОМОН",
-    "NORD SQUAD",
-    'ЦСН "Альфа"',,
-    "СОБР",
-    "ОТГ 141",
-    "NRF",
-    "12 ГУМО"
-]);
+import { UNITS } from "./editCategories";
+
+export function getApprovedUnitsSet(): Set<string> {
+    const approved = new Set<string>();
+    
+    for (const [id, name] of Object.entries(UNITS)) {
+        if (id !== "0") {
+            approved.add(name);
+        }
+    }
+    
+    return approved;
+}

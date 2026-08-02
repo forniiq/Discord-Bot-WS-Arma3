@@ -16,7 +16,7 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
         }
     }
 
-    // Игнорируем действия ботов
+    // Игнорируем действия ботов (опционально, уберите если нужны логи ботов)
     if (executor?.bot) return;
 
     // Безопасное формирование упоминаний и тегов
@@ -24,6 +24,47 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
     const executorMention = executor ? `<@${executor.id}>` : (executorId ? `<@${executorId}>` : 'Неизвестно');
 
     switch (action) {
+        // ==========================================
+        // 🏠 НАСТРОЙКИ СЕРВЕРА
+        // ==========================================
+
+        case AuditLogEvent.GuildUpdate: {
+            if (!changes) break;
+
+            const fields: { name: string; value: string; inline?: boolean }[] = [];
+
+            for (const change of changes) {
+                switch (change.key) {
+                    case 'name':
+                        fields.push({ name: '📝 Название сервера', value: `\`${change.old}\` ➔ \`${change.new}\`` });
+                        break;
+                    case 'afk_channel_id':
+                        fields.push({ name: '💤 AFK Канал', value: `<#${change.old}> ➔ <#${change.new}>` });
+                        break;
+                    case 'afk_timeout':
+                        fields.push({ name: '⏱️ Таймаут AFK', value: `\`${change.old} сек\` ➔ \`${change.new} сек\`` });
+                        break;
+                    case 'verification_level':
+                        fields.push({ name: '🔒 Уровень проверки', value: `\`${change.old}\` ➔ \`${change.new}\`` });
+                        break;
+                    case 'icon_hash':
+                        fields.push({ name: '🖼️ Иконка сервера', value: 'Была обновлена иконка сервера.' });
+                        break;
+                }
+            }
+
+            if (fields.length > 0) {
+                await sendAdminLog({
+                    title: '⚙️ Изменение настроек сервера',
+                    description: `Модератор ${executorMention} изменил настройки сервера.`,
+                    color: '#f1c40f',
+                    fields,
+                    executorId: executorId || executor?.id,
+                });
+            }
+            break;
+        }
+
         // ==========================================
         // 👥 ДЕЙСТВИЯ С УЧАСТНИКАМИ СЕРВЕРА
         // ==========================================
@@ -139,6 +180,18 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                     executorId: executorId || executor?.id,
                 });
             }
+
+            // Серверный деаф (глушение наушников)
+            const deafChange = changes.find((c: any) => c.key === 'deaf');
+            if (deafChange) {
+                const isDeafened = Boolean(deafChange.new);
+                await sendAdminLog({
+                    title: isDeafened ? '🔇 Отключение звука участнику' : '🔊 Включение звука участнику',
+                    description: `Модератор ${executorMention} ${isDeafened ? 'выключил звук' : 'включил звук'} участнику <@${targetId}>.`,
+                    color: isDeafened ? '#e67e22' : '#2ecc71',
+                    executorId: executorId || executor?.id,
+                });
+            }
             break;
         }
 
@@ -203,12 +256,11 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
         }
 
         // ==========================================
-        // 💬 МОДЕРАЦИЯ ТЕКСТОВЫХ КАНАЛОВ
+        // 💬 МОДЕРАЦИЯ ТЕКСТОВЫХ И ГОЛОСОВЫХ КАНАЛОВ
         // ==========================================
 
         // 🧹 Очистка чата (Bulk Delete)
         case AuditLogEvent.MessageBulkDelete: {
-            // В Discord.js значение 'count' передается через объект extra
             const count = (extra as { count?: number })?.count ?? 'Неизвестно';
 
             await sendAdminLog({
@@ -240,6 +292,33 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                 color: '#95a5a6',
                 executorId: executorId || executor?.id,
             });
+            break;
+        }
+
+        // ✏️ Редактирование параметров канала
+        case AuditLogEvent.ChannelUpdate: {
+            if (!changes) break;
+            const fields: { name: string; value: string; inline?: boolean }[] = [];
+
+            const nameChange = changes.find((c: any) => c.key === 'name');
+            const topicChange = changes.find((c: any) => c.key === 'topic');
+            const nsfwChange = changes.find((c: any) => c.key === 'nsfw');
+            const slowmodeChange = changes.find((c: any) => c.key === 'rate_limit_per_user');
+
+            if (nameChange) fields.push({ name: 'Название', value: `\`${nameChange.old}\` ➔ \`${nameChange.new}\`` });
+            if (topicChange) fields.push({ name: 'Тема канала', value: `\`${topicChange.old || 'Пусто'}\` ➔ \`${topicChange.new || 'Пусто'}\`` });
+            if (nsfwChange) fields.push({ name: 'NSFW', value: `${nsfwChange.old ? 'Включен' : 'Выключен'} ➔ ${nsfwChange.new ? 'Включен' : 'Выключен'}` });
+            if (slowmodeChange) fields.push({ name: 'Медленный режим', value: `\`${slowmodeChange.old}сек\` ➔ \`${slowmodeChange.new}сек\`` });
+
+            if (fields.length > 0) {
+                await sendAdminLog({
+                    title: '🛠️ Изменение настроек канала',
+                    description: `Модератор ${executorMention} изменил настройки канала <#${targetId}>.`,
+                    color: '#f39c12',
+                    fields,
+                    executorId: executorId || executor?.id,
+                });
+            }
             break;
         }
 
@@ -277,12 +356,20 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
 
             const nameChange = changes.find((c: any) => c.key === 'name');
             const permChange = changes.find((c: any) => c.key === 'permissions');
+            const colorChange = changes.find((c: any) => c.key === 'color');
 
             const fields = [];
             if (nameChange) {
                 fields.push({
                     name: 'Название роли',
                     value: `\`${nameChange.old}\` ➔ \`${nameChange.new}\``,
+                    inline: false,
+                });
+            }
+            if (colorChange) {
+                fields.push({
+                    name: 'Цвет роли',
+                    value: `\`#${Number(colorChange.old).toString(16)}\` ➔ \`#${Number(colorChange.new).toString(16)}\``,
                     inline: false,
                 });
             }
@@ -346,6 +433,111 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
         }
 
         // ==========================================
+        // 🌐 ВЕБХУКИ И ИНТЕГРАЦИИ
+        // ==========================================
+
+        case AuditLogEvent.WebhookCreate: {
+            const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'вебхук';
+            await sendAdminLog({
+                title: '🔗 Создание вебхука',
+                description: `Модератор ${executorMention} создал вебхук \`${name}\` (ID: \`${targetId}\`).`,
+                color: '#2ecc71',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.WebhookUpdate: {
+            await sendAdminLog({
+                title: '🔗 Редактирование вебхука',
+                description: `Модератор ${executorMention} изменил настройки вебхука (ID: \`${targetId}\`).`,
+                color: '#f1c40f',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.WebhookDelete: {
+            await sendAdminLog({
+                title: '🔗 Удаление вебхука',
+                description: `Модератор ${executorMention} удалил вебхук (ID: \`${targetId}\`).`,
+                color: '#e74c3c',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        // ==========================================
+        // 📅 МЕРОПРИЯТИЯ (SCHEDULED EVENTS)
+        // ==========================================
+
+        case AuditLogEvent.GuildScheduledEventCreate: {
+            const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'Событие';
+            await sendAdminLog({
+                title: '📅 Создание события',
+                description: `Модератор ${executorMention} создал мероприятие \`${name}\`.`,
+                color: '#2ecc71',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.GuildScheduledEventUpdate: {
+            await sendAdminLog({
+                title: '📅 Обновление события',
+                description: `Модератор ${executorMention} обновил детали мероприятия (ID: \`${targetId}\`).`,
+                color: '#f1c40f',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.GuildScheduledEventDelete: {
+            await sendAdminLog({
+                title: '📅 Отмена события',
+                description: `Модератор ${executorMention} отменил мероприятие (ID: \`${targetId}\`).`,
+                color: '#e74c3c',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        // ==========================================
+        // 🤖 ПРАВИЛА АВТОМОДЕРАЦИИ (AUTOMOD)
+        // ==========================================
+
+        case AuditLogEvent.AutoModerationRuleCreate: {
+            const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'Правило';
+            await sendAdminLog({
+                title: '🤖 Создание правила AutoMod',
+                description: `Модератор ${executorMention} создал правило автоматической модерации \`${name}\`.`,
+                color: '#2ecc71',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.AutoModerationRuleUpdate: {
+            await sendAdminLog({
+                title: '🤖 Изменение правила AutoMod',
+                description: `Модератор ${executorMention} обновил правило AutoMod (ID: \`${targetId}\`).`,
+                color: '#f1c40f',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        case AuditLogEvent.AutoModerationRuleDelete: {
+            await sendAdminLog({
+                title: '🤖 Удаление правила AutoMod',
+                description: `Модератор ${executorMention} удалил правило AutoMod (ID: \`${targetId}\`).`,
+                color: '#e74c3c',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        // ==========================================
         // 📜 ПРИГЛАШЕНИЯ, ЭМОДЗИ И СТИКЕРЫ
         // ==========================================
 
@@ -385,6 +577,19 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
+        // ✏️ Обновление эмодзи
+        case AuditLogEvent.EmojiUpdate: {
+            const oldName = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'эмодзи';
+            const newName = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'эмодзи';
+            await sendAdminLog({
+                title: '✏️ Переименование эмодзи',
+                description: `Модератор ${executorMention} переименовал эмодзи с \`:${oldName}:\` на \`:${newName}:\`.`,
+                color: '#f1c40f',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
         // 🗑️ Удаление эмодзи
         case AuditLogEvent.EmojiDelete: {
             const name = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'эмодзи';
@@ -404,6 +609,17 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                 title: '🎨 Добавление стикера',
                 description: `Модератор ${executorMention} добавил стикер \`${name}\`.`,
                 color: '#2ecc71',
+                executorId: executorId || executor?.id,
+            });
+            break;
+        }
+
+        // ✏️ Редактирование стикера
+        case AuditLogEvent.StickerUpdate: {
+            await sendAdminLog({
+                title: '✏️ Обновление стикера',
+                description: `Модератор ${executorMention} обновил информацию о стикере (ID: \`${targetId}\`).`,
+                color: '#f1c40f',
                 executorId: executorId || executor?.id,
             });
             break;

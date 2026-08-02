@@ -1,5 +1,6 @@
 import { Transaction, QueryTypes } from "sequelize";
 import { sequelize } from "./connect";
+import { RANKS_DATA, RankInfo } from "../config/ranks";
 
 export interface OnlinePlayer {
     pName: string;
@@ -35,6 +36,10 @@ export interface TransferResult {
     success: boolean;
     error?: 'STUDENT_NOT_FOUND' | 'INSTRUCTOR_NOT_FOUND' | 'NOT_ENOUGH_EXP' | 'UNKNOWN_ERROR';
     studentExpLeft?: number;
+    studentInitialExp?: number;
+    rankChanged?: boolean;
+    oldRank?: string;
+    newRank?: string;
 }
 
 export interface LogZBD {
@@ -47,6 +52,13 @@ export interface LogZBD {
     Count300: number;
     Count200: number;
     dCheck: number;
+}
+
+export interface UnitData {
+    uUID: string;
+    uName: string;
+    uTag: string;
+    dRoleID: string | null;
 }
 
 // Количество игроков на сервере
@@ -177,11 +189,6 @@ export async function processExamPayment(
             return { success: false, error: 'STUDENT_NOT_FOUND' };
         }
 
-        if (student.pExp < cost) {
-            await transaction.rollback();
-            return { success: false, error: 'NOT_ENOUGH_EXP' };
-        }
-
         // 2. Находим инструктора
         const instructors = await sequelize.query<PlayerInfo>(
             `SELECT * FROM players WHERE DiscID = :instructorDiscordId AND DiscID IS NOT NULL AND DiscID != '0' AND DiscID != '' LIMIT 1`,
@@ -198,13 +205,53 @@ export async function processExamPayment(
             return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
         }
 
+        let newExp = student.pExp - cost;
+        let newRank = student.pLvl;
+        let rankChanged = false;
+        const initialExp = student.pExp;
+
+        // Расчет понижения ранга при отрицательном балансе
+        if (newExp < 0) {
+            let deficit = Math.abs(newExp);
+            let currentRankIndex = RANKS_DATA.findIndex(
+                r => r.name === student.pLvl || r.shortName === student.pLvl || r.fullName === student.pLvl
+            );
+
+            if (currentRankIndex === -1) {
+                currentRankIndex = 1; // Рядовой
+            }
+
+            while (deficit > 0 && currentRankIndex > 0) {
+                const currentRank = RANKS_DATA[currentRankIndex];
+                const currentRankExpRequirement = currentRank ? currentRank.exp : 0;
+
+                if (deficit <= currentRankExpRequirement) {
+                    currentRankIndex--;
+                    newExp = currentRankExpRequirement - deficit;
+                    deficit = 0;
+                } else {
+                    deficit -= currentRankExpRequirement;
+                    currentRankIndex--;
+                }
+            }
+
+            if (deficit > 0 && currentRankIndex === 0) {
+                await transaction.rollback();
+                return { success: false, error: 'NOT_ENOUGH_EXP' };
+            }
+
+            const targetRank = RANKS_DATA[currentRankIndex];
+            newRank = targetRank ? targetRank.name : student.pLvl;
+            rankChanged = newRank !== student.pLvl;
+        }
+
         const instructorExp = Math.floor(cost * 0.8);
         const bankExp = Math.ceil(cost * 0.2);
 
-        // 3. Списываем EXP у курсанта
+        // 3. Обновляем EXP и звание курсанта
         await sequelize.query(
-            `UPDATE players SET pExp = pExp - :cost WHERE pUID = :pUID`,
-            { replacements: { cost, pUID: student.pUID }, transaction }
+            `UPDATE players SET pExp = :newExp, pLvl = :newRank WHERE pUID = :pUID`,
+            { replacements: { newExp, newRank, pUID: student.pUID }, transaction }
         );
 
         // 4. Начисляем EXP инструктору
@@ -213,19 +260,22 @@ export async function processExamPayment(
             { replacements: { instructorExp, pUID: instructor.pUID }, transaction }
         );
 
-        // 5. Пополняем банк (создаем запись, если её ещё нет)
+        // 5. Пополняем банк
         await sequelize.query(
             `INSERT INTO bank (id, expBank) VALUES (1, :bankExp) 
             ON DUPLICATE KEY UPDATE expBank = expBank + :bankExp`,
             { replacements: { bankExp }, transaction }
         );
 
-        // Фиксируем транзакцию
         await transaction.commit();
 
         return {
             success: true,
-            studentExpLeft: student.pExp - cost,
+            studentInitialExp: initialExp,
+            studentExpLeft: newExp,
+            rankChanged,
+            oldRank: student.pLvl,
+            newRank
         };
     } catch (error) {
         await transaction.rollback();
@@ -259,4 +309,44 @@ export async function markZbdProcessed(date: string): Promise<void> {
 // чтобы при первом запуске бота не отправлялись древние логи.
 export async function markAllOldZbdProcessed(): Promise<void> {
     await sequelize.query(`UPDATE log_zbd SET dCheck = 1 WHERE dCheck = 0`);
+}
+
+export async function isOperator(discordId: string): Promise<boolean> {
+    try {
+        const [rows] = await sequelize.query(
+            `SELECT discord_id FROM operators WHERE discord_id = :discordId LIMIT 1`,
+            { replacements: { discordId } }
+        );
+
+        return (rows as any[]).length > 0;
+    } catch (error) {
+        console.error("Ошибка при проверке прав оператора:", error);
+        return false;
+    }
+}
+
+export async function getBankBalance(): Promise<number> {
+    try {
+        const [rows] = await sequelize.query(`
+            SELECT expBank FROM bank WHERE id = 1 LIMIT 1
+        `);
+        const result = (rows as any[])[0];
+        return result ? Number(result.expBank) : 0;
+    } catch (error) {
+        console.error("Ошибка при получении баланса банка:", error);
+        return 0;
+    }
+}
+
+export async function getAllUnits(): Promise<UnitData[]> {
+    try {
+        const [rows] = await sequelize.query(`
+            SELECT uUID, uName, uTag, dRoleID 
+            FROM units
+        `);
+        return rows as UnitData[];
+    } catch (e) {
+        console.error("Ошибка при получении списка отрядов:", e);
+        return [];
+    }
 }

@@ -28,18 +28,16 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         });
     }
 
-    // Embed с предупреждением
     const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ Подтверждение массовой синхронизации')
         .setDescription(
             'Вы собираетесь запустить **полную синхронизацию ролей и никнеймов** для всех пользователей из базы данных.\n\n' +
-            '⏳ Этот процесс может занять несколько минут. Вы уверены, что хотите продолжить?'
+            '⏳ Этот процесс может занять некоторое время. Вы уверены, что хотите продолжить?'
         )
         .setColor('#f1c40f')
         .setFooter({ text: `Запрошено: ${interaction.user.tag}` })
         .setTimestamp();
 
-    // Кнопки подтверждения
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId('confirm_sync')
@@ -53,7 +51,6 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             .setEmoji('❌')
     );
 
-    // Публичный ответ в чат (ephemeral: false)
     const responseMessage = await interaction.reply({
         embeds: [confirmEmbed],
         components: [row],
@@ -61,14 +58,12 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         fetchReply: true
     });
 
-    // Коллектор для обработки клика по кнопкам (таймаут 60 секунд)
     const collector = responseMessage.createMessageComponentCollector({
         componentType: ComponentType.Button,
         time: 60_000
     });
 
     collector.on('collect', async (i) => {
-        // Проверка: нажимать кнопки может только тот администратор, который вызвал команду
         if (i.user.id !== interaction.user.id) {
             return void i.reply({
                 content: '❌ Только инициатор команды может подтвердить или отменить действие.',
@@ -79,19 +74,19 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         if (i.customId === 'confirm_sync') {
             collector.stop('confirmed');
 
-            // Отключаем кнопки и чистим embed для плавного перехода
             const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 row.components.map(button => button.setDisabled(true))
             );
 
             await i.update({
-                content: '🚀 **Инициализация процесса...**',
+                content: '🚀 **Инициализация процесса массовой синхронизации...**',
                 embeds: [],
                 components: [disabledRow]
             });
 
-            // Передаем исходный interaction в сервис
-            await runBulkSync(interaction.guild!, interaction);
+            // Решение ошибки TS2345: приведение к any обходит дублирование типов discord.js
+            await runBulkSync(interaction.guild as any, interaction as any);
+
         } else if (i.customId === 'cancel_sync') {
             collector.stop('canceled');
 
@@ -109,7 +104,6 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     });
 
     collector.on('end', async (_, reason) => {
-        // Если время вышло и пользователь не нажал ни одну из кнопок
         if (reason === 'time') {
             const timeoutEmbed = new EmbedBuilder()
                 .setTitle('⏱️ Время ожидания истекло')

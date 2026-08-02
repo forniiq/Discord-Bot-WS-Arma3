@@ -1,6 +1,7 @@
 import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { ApplicationCommandOptionType } from 'discord.js';
 import { openEditPanel } from '@/services/adminEditService';
+import { isOperator } from '@/database/queries';
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',
@@ -27,6 +28,19 @@ export const command: CommandData = {
 };
 
 export const chatInput: ChatInputCommand = async (ctx) => {
+    const userId = ctx.interaction.user.id;
+
+    // 1. Проверка прав оператора в базе данных
+    const hasAccess = await isOperator(userId);
+
+    if (!hasAccess) {
+        return void ctx.interaction.reply({
+            content: '🚫 **Отказано в доступе.** У вас нет прав доступа для использования этой команды.',
+            ephemeral: true
+        });
+    }
+
+    // 2. Получение параметров команды
     const targetUser = ctx.interaction.options.getUser('discord');
     const pUID = ctx.interaction.options.getString('puid');
 
@@ -37,6 +51,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         });
     }
 
+    // 3. Открытие панели редактирования
     await openEditPanel({
         interaction: ctx.interaction,
         targetDiscordUser: targetUser ?? undefined,

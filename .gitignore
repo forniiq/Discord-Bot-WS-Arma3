@@ -34,5 +34,3 @@ lerna-debug.log*
 # other
 **/*.DS_Store
 .temp-example
-
-src/config/rolesConfig.ts

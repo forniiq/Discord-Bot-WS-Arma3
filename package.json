@@ -1,7 +1,7 @@
 {
   "name": "Discord Bot WS Arma",
   "description": "A CommandKit project using TypeScript",
-  "version": "0.1.9",
+  "version": "0.1.13",
   "type": "module",
   "private": true,
   "main": "dist/index.js",
