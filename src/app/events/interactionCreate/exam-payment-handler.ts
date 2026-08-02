@@ -11,59 +11,17 @@ import {
     RepliableInteraction
 } from 'discord.js';
 import { EXAM_DATA, ExamCategory, ExamItem, getRequiredInstructorRoleId } from '../../../config/exams';
-import { processExamPayment, findPlayer } from '../../../database/queries';
+import { processExamPayment, findPlayer, calculateRankDemotion } from '../../../database/queries';
 import { sendAdminLog } from '../../../utils/logger';
 import { updateBankDisplay } from '@/services/bankService';
-import { RANKS_DATA } from '../../../config/ranks';
 
 const EXAMINERS_CHANNEL_ID = process.env.EXAMINERS_CHANNEL_ID as string;
 
-// Вспомогательная функция для предварительной проверки понижения ранга
-function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number) {
-    let expLeft = currentExp - cost;
-    let rankName = currentRankName;
-    const initialRank = currentRankName;
-    let rankChanged = false;
-
-    while (expLeft < 0) {
-        const currentRankIndex = RANKS_DATA.findIndex(
-            (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
-        );
-
-        if (currentRankIndex <= 0) {
-            return {
-                willDemote: false,
-                oldRank: initialRank,
-                newRank: rankName,
-                finalExp: expLeft,
-                insufficientExp: true,
-            };
-        }
-
-        const prevRank = RANKS_DATA[currentRankIndex - 1];
-        if (!prevRank) break;
-
-        expLeft = prevRank.exp + expLeft;
-        rankName = prevRank.name;
-        rankChanged = true;
-    }
-
-    return {
-        willDemote: rankChanged,
-        oldRank: initialRank,
-        newRank: rankName,
-        finalExp: expLeft,
-        insufficientExp: false,
-    };
-}
-
 export default async function (interaction: Interaction) {
     if (!interaction.isButton() || interaction.customId !== 'start_exam_pay') return;
-    if (!interaction.inCachedGuild()) return;
 
     // Ищем игрока в БД, чтобы получить текущий баланс
     const studentData = await findPlayer({ discordId: interaction.user.id });
-
     if (!studentData) {
         return void interaction.reply({
             content: '❌ Ваш аккаунт Discord не привязан к игровой базе данных!',
@@ -159,11 +117,21 @@ export default async function (interaction: Interaction) {
                 const instructorExp = Math.floor(selectedExam.cost * 0.8);
                 const bankExp = Math.ceil(selectedExam.cost * 0.2);
 
+                // Используем импортированную функцию
                 const demotionPreview = calculateRankDemotion(
                     Number(studentData.pExp) || 0,
                     studentData.pLvl,
                     selectedExam.cost
                 );
+
+                // Если даже с максимальным понижением не хватает опыта
+                if (demotionPreview.insufficientExp) {
+                    await i.reply({
+                        content: `❌ У вас недостаточно опыта для сдачи этого экзамена (**${selectedExam.cost} EXP**). Ваш текущий баланс: **${studentData.pExp} EXP**.`,
+                        ephemeral: true
+                    });
+                    return;
+                }
 
                 const confirmEmbed = new EmbedBuilder()
                     .setTitle('⚙️ Подтверждение перевода')
@@ -177,12 +145,13 @@ export default async function (interaction: Interaction) {
                         { name: 'Комиссия в банк (20%)', value: `**${bankExp}** EXP`, inline: true }
                     );
 
+                // Предупреждение о понижении
                 if (demotionPreview.willDemote) {
                     confirmEmbed.addFields({
                         name: '⚠️ ВНИМАНИЕ: ПОНИЖЕНИЕ ЗВАНИЯ',
                         value: `Вашего текущего опыта не хватает для покрытия стоимости экзамена.\n` +
-                               `В результате оплаты ваше звание будет понижено:\n` +
-                               `\`${demotionPreview.oldRank}\` ➔ \`${demotionPreview.newRank}\`\n` +
+                                `В результате оплаты ваше звание будет понижено:\n` +
+                                `\`${demotionPreview.oldRank}\` ➔ \`${demotionPreview.newRank}\`\n` +
                                `*Остаток EXP после понижения: **${demotionPreview.finalExp} EXP***`,
                         inline: false
                     });
@@ -426,11 +395,10 @@ function createExamButtons(items: ExamItem[]) {
     return [row];
 }
 
-function findExamById(id: string): ExamItem | null {
-    const categories = Object.values(EXAM_DATA) as ExamCategory[];
-    for (const cat of categories) {
-        const found = cat.items.find((item: ExamItem) => item.id === id);
-        if (found) return found;
+function findExamById(examId: string): ExamItem | null {
+    for (const catKey in EXAM_DATA) {
+        const item = EXAM_DATA[catKey]?.items.find(i => i.id === examId);
+        if (item) return item;
     }
     return null;
 }

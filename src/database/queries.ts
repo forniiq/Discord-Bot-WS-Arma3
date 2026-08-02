@@ -71,7 +71,7 @@ export interface ExamPaymentResult {
     newRank?: string;
 }
 
-interface DemotionResult {
+export interface DemotionResult {
     willDemote: boolean;
     oldRank: string;
     newRank: string;
@@ -183,61 +183,42 @@ export async function findAllSyncablePlayers(): Promise<PlayerInfo[]> {
     return rows as PlayerInfo[];
 }
 
-function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number): DemotionResult {
-    let totalExpAvailable = currentExp;
+export function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number): DemotionResult {
+    let expLeft = currentExp - cost;
     let rankName = currentRankName;
     const initialRank = currentRankName;
     let rankChanged = false;
 
-    let currentRankIndex = RANKS_DATA.findIndex(
-        (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
-    );
+    while (expLeft < 0) {
+        const currentRankIndex = RANKS_DATA.findIndex(
+            r => r.name === rankName || r.fullName === rankName || r.shortName === rankName
+        );
+        if (currentRankIndex <= 0) break; // Мы на самом нижнем ранге, дальше понижать некуда
 
-    if (currentRankIndex === -1) currentRankIndex = 0;
+        const prevRank = RANKS_DATA[currentRankIndex - 1];
+        if (!prevRank) break; // Защита для TS
 
-    let remainingCost = cost - totalExpAvailable;
-
-    if (remainingCost <= 0) {
-        return {
-            willDemote: false,
-            oldRank: initialRank,
-            newRank: initialRank,
-            finalExp: totalExpAvailable - cost,
-            insufficientExp: false,
-        };
-    }
-
-    while (remainingCost > 0) {
-        if (currentRankIndex <= 0) {
-            return {
-                willDemote: false,
-                oldRank: initialRank,
-                newRank: initialRank,
-                finalExp: totalExpAvailable - cost,
-                insufficientExp: true,
-            };
-        }
-
-        currentRankIndex--;
-        const prevRank = RANKS_DATA[currentRankIndex];
-        
-        // Защита от undefined для TypeScript
-        if (!prevRank) {
-            break;
-        }
-
-        totalExpAvailable += prevRank.exp;
-        remainingCost = cost - totalExpAvailable;
+        expLeft += prevRank.exp; // Используем правильное поле .exp из RankInfo
         rankName = prevRank.name;
         rankChanged = true;
     }
 
+    if (expLeft < 0) {
+        return {
+            insufficientExp: true,
+            willDemote: false,
+            oldRank: initialRank,
+            newRank: rankName,
+            finalExp: currentExp
+        };
+    }
+
     return {
+        insufficientExp: false,
         willDemote: rankChanged,
         oldRank: initialRank,
         newRank: rankName,
-        finalExp: Math.abs(remainingCost),
-        insufficientExp: false,
+        finalExp: expLeft
     };
 }
 
@@ -248,25 +229,32 @@ export async function processExamPayment(studentDiscordId: string, instructorDis
     if (!student || !student.DiscID) return { success: false, error: 'STUDENT_NOT_FOUND' };
     if (!instructor || !instructor.DiscID) return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
 
-    const demotion: DemotionResult = calculateRankDemotion(Number(student.pExp) || 0, student.pLvl, cost);
+    const studentCurrentExp = Number(student.pExp) || 0;
+    const demotion: DemotionResult = calculateRankDemotion(studentCurrentExp, student.pLvl, cost);
 
     if (demotion.insufficientExp) {
         return { success: false, error: 'NOT_ENOUGH_EXP' };
     }
 
-    const initialExp = student.pExp;
+    const initialExp = studentCurrentExp;
     const instructorReward = Math.floor(cost * 0.8);
 
-    // Используем проверенные studentDiscordId / instructorDiscordId 
-    // либо гарантированное обращение к student.DiscID
+    // Обновляем опыт и ранг курсанта
     await updatePlayerField(student.DiscID, 'pExp', demotion.finalExp);
     if (demotion.willDemote) {
         await updatePlayerField(student.DiscID, 'pLvl', demotion.newRank);
     }
 
-    // Начисляем опыт инструктору
+    // Начисляем опыт инструктору (80%)
     const newInstructorExp = (Number(instructor.pExp) || 0) + instructorReward;
     await updatePlayerField(instructor.DiscID, 'pExp', newInstructorExp);
+
+    // Вычисляем комиссию в банк (20%) и пополняем expBank в БД
+    const bankExp = Math.ceil(cost * 0.2);
+    await sequelize.query(
+        'UPDATE bank SET expBank = expBank + :bankExp LIMIT 1',
+        { replacements: { bankExp }, type: QueryTypes.UPDATE }
+    ).catch(() => null);
 
     return {
         success: true,
