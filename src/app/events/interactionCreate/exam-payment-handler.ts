@@ -4,18 +4,62 @@ import {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    UserSelectMenuBuilder,
-    ChannelType
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    ChannelType,
+    GuildMember,
+    RepliableInteraction
 } from 'discord.js';
-import { EXAM_DATA, ExamCategory, ExamItem } from '../../../config/exams';
+import { EXAM_DATA, ExamCategory, ExamItem, getRequiredInstructorRoleId } from '../../../config/exams';
 import { processExamPayment, findPlayer } from '../../../database/queries';
 import { sendAdminLog } from '../../../utils/logger';
 import { updateBankDisplay } from '@/services/bankService';
+import { RANKS_DATA } from '../../../config/ranks';
 
 const EXAMINERS_CHANNEL_ID = process.env.EXAMINERS_CHANNEL_ID as string;
 
+// Вспомогательная функция для предварительной проверки понижения ранга
+function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number) {
+    let expLeft = currentExp - cost;
+    let rankName = currentRankName;
+    const initialRank = currentRankName;
+    let rankChanged = false;
+
+    while (expLeft < 0) {
+        const currentRankIndex = RANKS_DATA.findIndex(
+            (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
+        );
+
+        if (currentRankIndex <= 0) {
+            return {
+                willDemote: false,
+                oldRank: initialRank,
+                newRank: rankName,
+                finalExp: expLeft,
+                insufficientExp: true,
+            };
+        }
+
+        const prevRank = RANKS_DATA[currentRankIndex - 1];
+        if (!prevRank) break;
+
+        expLeft = prevRank.exp + expLeft;
+        rankName = prevRank.name;
+        rankChanged = true;
+    }
+
+    return {
+        willDemote: rankChanged,
+        oldRank: initialRank,
+        newRank: rankName,
+        finalExp: expLeft,
+        insufficientExp: false,
+    };
+}
+
 export default async function (interaction: Interaction) {
     if (!interaction.isButton() || interaction.customId !== 'start_exam_pay') return;
+    if (!interaction.inCachedGuild()) return;
 
     // Ищем игрока в БД, чтобы получить текущий баланс
     const studentData = await findPlayer({ discordId: interaction.user.id });
@@ -28,51 +72,23 @@ export default async function (interaction: Interaction) {
     }
 
     // Состояния текущей сессии
+    let selectedCategoryId: string | null = null;
     let selectedInstructorId: string | null = null;
     let selectedExam: ExamItem | null = null;
-    let selectedCategoryId: string | null = null;
 
-    // Функция отрисовки Шага 1 
-    const renderStep1 = () => {
-        const instructorSelect = new UserSelectMenuBuilder()
-            .setCustomId('select_instructor')
-            .setPlaceholder('Выберите инструктора, принявшего экзамен');
-
-        const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(instructorSelect);
-
+    // Отрисовка Шага 1: Выбор Категории
+    const renderStep1Categories = () => {
+        const row = createCategoryButtons();
         return {
-            content: `💳 **Ваш текущий баланс:** **${studentData.pExp}** EXP | Звание: **${studentData.pLvl}**\n\n👤 **Шаг 1 из 3:** Выберите инструктора из списка:`,
+            content: `💳 **Ваш текущий баланс:** **${studentData.pExp}** EXP | Звание: **${studentData.pLvl}**\n\n📂 **Шаг 1 из 3:** Выберите категорию экзамена:`,
             embeds: [],
-            components: [row],
-        };
-    };
-
-    // Функция отрисовки Шага 2 (Выбор категории)
-    const renderStep2 = () => {
-        const categoryRows = createCategoryButtons();
-        return {
-            content: `💳 **Ваш баланс:** **${studentData.pExp}** EXP\n👤 Инструктор: <@${selectedInstructorId}>\n\n📂 **Шаг 2 из 3:** Выберите категорию экзамена:`,
-            embeds: [],
-            components: categoryRows,
-        };
-    };
-
-    // Функция отрисовки Шага 2.5 (Выбор конкретного экзамена)
-    const renderStep2Exams = (categoryId: string) => {
-        const category = EXAM_DATA[categoryId];
-        if (!category) return null;
-
-        const examRows = createExamButtons(category.items);
-        return {
-            content: `💳 **Ваш баланс:** **${studentData.pExp}** EXP\n👤 Инструктор: <@${selectedInstructorId}>\n📋 Категория: **${category.label}**\n\nВыберите экзамен:`,
-            embeds: [],
-            components: examRows,
+            components: row,
         };
     };
 
     // Инициализация интерфейса
     const response = await interaction.reply({
-        ...renderStep1(),
+        ...renderStep1Categories(),
         ephemeral: true,
         fetchReply: true,
     });
@@ -87,199 +103,216 @@ export default async function (interaction: Interaction) {
             const target = i.customId.replace('back_to_', '');
 
             if (target === 'step1') {
-                selectedInstructorId = null;
                 selectedCategoryId = null;
-                await i.update(renderStep1());
+                selectedInstructorId = null;
+                await i.update(renderStep1Categories());
                 return;
             }
 
             if (target === 'step2') {
-                selectedCategoryId = null;
                 selectedExam = null;
-                await i.update(renderStep2());
-                return;
-            }
-        }
-
-        // 1: Выбор инструктора
-        if (i.isUserSelectMenu() && i.customId === 'select_instructor') {
-            const chosenId = i.values[0];
-
-            if (!chosenId) {
-                await i.reply({ content: '❌ Инструктор не выбран!', ephemeral: true });
-                return;
-            }
-
-            if (chosenId === i.user.id) {
-                await i.reply({ content: '❌ Вы не можете перевести опыт самому себе!', ephemeral: true });
-                return;
-            }
-
-            const selectedUser = i.users.get(chosenId);
-            if (selectedUser?.bot) {
-                await i.reply({ content: '❌ Нельзя переводить опыт боту!', ephemeral: true });
-                return;
-            }
-
-            selectedInstructorId = chosenId;
-            await i.update(renderStep2());
-        }
-
-        // Кнопки выбора категорий и экзаменов
-        if (i.isButton()) {
-            // Выбор категории
-            if (i.customId.startsWith('select_category_')) {
-                selectedCategoryId = i.customId.replace('select_category_', '');
-                const stepData = renderStep2Exams(selectedCategoryId);
-                if (stepData) {
-                    await i.update(stepData);
+                if (selectedCategoryId) {
+                    const step2Components = await buildInstructorStepComponents(i, selectedCategoryId);
+                    await i.update(step2Components);
                 }
+                return;
+            }
+        }
+
+        // --- ШАГ 1: Клик по кнопке категории ➔ Переход к Шагу 2 (Выбор инструктора) ---
+        if (i.isButton() && i.customId.startsWith('select_category_')) {
+            selectedCategoryId = i.customId.replace('select_category_', '');
+            const step2Components = await buildInstructorStepComponents(i, selectedCategoryId);
+            await i.update(step2Components);
+            return;
+        }
+
+        // --- ШАГ 2: Выбор инструктора из выпадающего списка ➔ Переход к выбору экзамена ---
+        if (i.isStringSelectMenu() && i.customId === 'select_instructor') {
+            selectedInstructorId = i.values[0] ?? null;
+
+            if (selectedInstructorId === i.user.id) {
+                await i.reply({ content: '❌ Вы не можете переводить опыт самому себе!', ephemeral: true });
+                return;
             }
 
-            // Выбор конкретного экзамена (Переход к шагу 3)
-            if (i.customId.startsWith('exam_pick_')) {
-                const examId = i.customId.replace('exam_pick_', '');
-                selectedExam = findExamById(examId);
-
-                if (selectedExam && selectedInstructorId) {
-                    const instructorExp = Math.floor(selectedExam.cost * 0.8);
-                    const bankExp = Math.ceil(selectedExam.cost * 0.2);
-
-                    const confirmEmbed = new EmbedBuilder()
-                        .setTitle('⚙️ Подтверждение перевода')
-                        .setColor('#f1c40f')
-                        .addFields(
-                            { name: 'Курсант', value: `<@${i.user.id}> (Баланс: ${studentData.pExp} EXP)`, inline: false },
-                            { name: 'Инструктор', value: `<@${selectedInstructorId}>`, inline: true },
-                            { name: 'Экзамен', value: `${selectedExam.label}`, inline: true },
-                            { name: 'Сумма списания', value: `**${selectedExam.cost}** EXP`, inline: true },
-                            { name: 'Получит инструктор (80%)', value: `**${instructorExp}** EXP`, inline: true },
-                            { name: 'Комиссия в банк (20%)', value: `**${bankExp}** EXP`, inline: true }
-                        );
-
-                    const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('confirm_pay')
-                            .setLabel('Подтвердить перевод')
-                            .setStyle(ButtonStyle.Success),
-                        new ButtonBuilder()
-                            .setCustomId(`back_to_step2`)
-                            .setLabel('⬅️ Назад к выбору')
-                            .setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder()
-                            .setCustomId('cancel_pay')
-                            .setLabel('Отмена')
-                            .setStyle(ButtonStyle.Danger)
-                    );
-
+            if (selectedCategoryId) {
+                const category = EXAM_DATA[selectedCategoryId];
+                if (category) {
+                    const examRows = createExamButtons(category.items);
                     await i.update({
-                        content: '⚠️ **Шаг 3 из 3:** Проверьте детали перевода:',
-                        embeds: [confirmEmbed],
-                        components: [confirmRow],
+                        content: `💳 **Ваш баланс:** **${studentData.pExp}** EXP\n📋 Категория: **${category.label}**\n👤 Инструктор: <@${selectedInstructorId}>\n\n📋 **Шаг 3 из 3:** Выберите конкретный экзамен:`,
+                        embeds: [],
+                        components: examRows,
                     });
                 }
             }
+            return;
+        }
 
-            // Отмена
-            if (i.customId === 'cancel_pay') {
-                collector.stop('cancelled');
-                await i.update({ content: '❌ Перевод отменен.', embeds: [], components: [] });
-            }
+        // --- ШАГ 3: Выбор экзамена ➔ Отображение экрана подтверждения ---
+        if (i.isButton() && i.customId.startsWith('exam_pick_')) {
+            const examId = i.customId.replace('exam_pick_', '');
+            selectedExam = findExamById(examId);
 
-            // Подтверждение оплаты
-            if (i.customId === 'confirm_pay' && selectedInstructorId && selectedExam) {
-                await i.deferUpdate();
+            if (selectedExam && selectedInstructorId) {
+                const instructorExp = Math.floor(selectedExam.cost * 0.8);
+                const bankExp = Math.ceil(selectedExam.cost * 0.2);
 
-                const result = await processExamPayment(
-                    i.user.id,
-                    selectedInstructorId,
+                const demotionPreview = calculateRankDemotion(
+                    Number(studentData.pExp) || 0,
+                    studentData.pLvl,
                     selectedExam.cost
                 );
 
-                if (result.success) {
-                    const instructorExp = Math.floor(selectedExam.cost * 0.8);
-                    const bankExp = Math.ceil(selectedExam.cost * 0.2);
+                const confirmEmbed = new EmbedBuilder()
+                    .setTitle('⚙️ Подтверждение перевода')
+                    .setColor(demotionPreview.willDemote ? '#e74c3c' : '#f1c40f')
+                    .addFields(
+                        { name: 'Курсант', value: `<@${i.user.id}> (Баланс: ${studentData.pExp} EXP)`, inline: false },
+                        { name: 'Инструктор', value: `<@${selectedInstructorId}>`, inline: true },
+                        { name: 'Экзамен', value: `${selectedExam.label}`, inline: true },
+                        { name: 'Сумма списания', value: `**${selectedExam.cost}** EXP`, inline: true },
+                        { name: 'Получит инструктор (80%)', value: `**${instructorExp}** EXP`, inline: true },
+                        { name: 'Комиссия в банк (20%)', value: `**${bankExp}** EXP`, inline: true }
+                    );
 
-                    let rankNotice = '';
-                    if (result.rankChanged) {
-                        rankNotice = `\n\n⚠️ **Внимание:** В связи с недостатком опыта ваш ранг понижен: \`${result.oldRank}\` ➔ \`${result.newRank}\``;
-                    }
-
-                    const successEmbed = new EmbedBuilder()
-                        .setTitle('✅ Оплата пройдена успешно!')
-                        .setColor('#2ecc71')
-                        .setDescription(
-                            `Вы перевели **${selectedExam.cost} EXP** за экзамен **${selectedExam.label}**.\n\n` +
-                            `• Инструктор <@${selectedInstructorId}> получил: **${instructorExp} EXP**\n` +
-                            `• В банк отправлено: **${bankExp} EXP**\n` +
-                            `• Ваш начальный баланс: **${result.studentInitialExp} EXP**\n` +
-                            `• Ваш остаток: **${result.studentExpLeft} EXP**` +
-                            rankNotice
-                        );
-
-                    await i.editReply({ content: '', embeds: [successEmbed], components: [] });
-                    collector.stop('completed');
-
-                    // 1. Отправка в канал экзаменаторов
-                    try {
-                        const examChannel = i.client.channels.cache.get(EXAMINERS_CHANNEL_ID) || 
-                                            await i.client.channels.fetch(EXAMINERS_CHANNEL_ID).catch(() => null);
-
-                        if (examChannel && examChannel.type === ChannelType.GuildText) {
-                            const publicEmbed = new EmbedBuilder()
-                                .setTitle('🎓 Подтверждение оплаты экзамена')
-                                .setColor('#3498db')
-                                .setDescription(
-                                    `Курсант <@${i.user.id}> успешно оплатил экзамен **${selectedExam.label}**.\n` +
-                                    `Инструктору <@${selectedInstructorId}> начислено **${instructorExp} EXP**.`
-                                )
-                                .addFields(
-                                    { name: 'Сумма экзамена', value: `${selectedExam.cost} EXP`, inline: true },
-                                    { name: 'Остаток у курсанта', value: `${result.studentExpLeft} EXP`, inline: true },
-                                    ...(result.rankChanged ? [{ name: 'Изменение звания', value: `\`${result.oldRank}\` ➔ \`${result.newRank}\``, inline: false }] : [])
-                                )
-                                .setTimestamp();
-
-                            await examChannel.send({
-                                content: `🔔 Инструктор <@${selectedInstructorId}>, вам поступила оплата экзамена!`,
-                                embeds: [publicEmbed]
-                            });
-                        }
-                    } catch (err) {
-                        console.error('Ошибка отправки в канал экзаменаторов:', err);
-                    }
-
-                    // 2. Логирование
-                    await sendAdminLog({
-                        title: '💳 Оплата экзамена',
-                        description: `Курсант <@${i.user.id}> перевел опыт инструктору <@${selectedInstructorId}>.`,
-                        color: '#2ecc71',
-                        executorId: i.user.id,
-                        fields: [
-                            { name: 'Экзамен', value: selectedExam.label, inline: true },
-                            { name: 'Стоимость', value: `${selectedExam.cost} EXP`, inline: true },
-                            { name: 'Инструктор получил', value: `${instructorExp} EXP`, inline: true },
-                            { name: 'В банк', value: `${bankExp} EXP`, inline: true },
-                            { name: 'Баланс до/после', value: `${result.studentInitialExp} ➔ ${result.studentExpLeft} EXP`, inline: false },
-                            ...(result.rankChanged ? [{ name: 'Понижение звания', value: `\`${result.oldRank}\` ➔ \`${result.newRank}\``, inline: false }] : [])
-                        ]
+                if (demotionPreview.willDemote) {
+                    confirmEmbed.addFields({
+                        name: '⚠️ ВНИМАНИЕ: ПОНИЖЕНИЕ ЗВАНИЯ',
+                        value: `Вашего текущего опыта не хватает для покрытия стоимости экзамена.\n` +
+                               `В результате оплаты ваше звание будет понижено:\n` +
+                               `\`${demotionPreview.oldRank}\` ➔ \`${demotionPreview.newRank}\`\n` +
+                               `*Остаток EXP после понижения: **${demotionPreview.finalExp} EXP***`,
+                        inline: false
                     });
-
-                    updateBankDisplay(i.client);
-
-                } else {
-                    let errorMsg = '💥 Произошла непредвиденная ошибка.';
-                    if (result.error === 'STUDENT_NOT_FOUND') {
-                        errorMsg = '❌ Ваш профиль не найден в базе данных (не привязан Discord)!';
-                    } else if (result.error === 'INSTRUCTOR_NOT_FOUND') {
-                        errorMsg = '❌ Профиль инструктора не найден в базе данных (не привязан Discord)!';
-                    } else if (result.error === 'NOT_ENOUGH_EXP') {
-                        errorMsg = '❌ У вас недостаточно опыта даже при возможном понижении звания!';
-                    }
-
-                    await i.editReply({ content: errorMsg, embeds: [], components: [] });
-                    collector.stop('error');
                 }
+
+                const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('confirm_pay')
+                        .setLabel(demotionPreview.willDemote ? 'Подтвердить (с понижением)' : 'Подтвердить перевод')
+                        .setStyle(demotionPreview.willDemote ? ButtonStyle.Danger : ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId('back_to_step2')
+                        .setLabel('⬅️ Назад к выбору')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('cancel_pay')
+                        .setLabel('Отмена')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+                await i.update({
+                    content: demotionPreview.willDemote 
+                        ? '⚠️ **Проверьте детали перевода:** (Оплата приведет к понижению ранга!)'
+                        : '⚠️ **Проверьте детали перевода:**',
+                    embeds: [confirmEmbed],
+                    components: [confirmRow],
+                });
+            }
+            return;
+        }
+
+        // Отмена
+        if (i.isButton() && i.customId === 'cancel_pay') {
+            collector.stop('cancelled');
+            await i.update({ content: '❌ Перевод отменен.', embeds: [], components: [] });
+            return;
+        }
+
+        // Подтверждение оплаты
+        if (i.isButton() && i.customId === 'confirm_pay' && selectedInstructorId && selectedExam) {
+            await i.deferUpdate();
+
+            const result = await processExamPayment(
+                i.user.id,
+                selectedInstructorId,
+                selectedExam.cost
+            );
+
+            if (result.success) {
+                const instructorExp = Math.floor(selectedExam.cost * 0.8);
+                const bankExp = Math.ceil(selectedExam.cost * 0.2);
+
+                let rankNotice = '';
+                if (result.rankChanged) {
+                    rankNotice = `\n\n🔻 **Внимание! Ваш ранг был понижен:** \`${result.oldRank}\` ➔ \`${result.newRank}\``;
+                }
+
+                const successEmbed = new EmbedBuilder()
+                    .setTitle('✅ Оплата пройдена успешно!')
+                    .setColor(result.rankChanged ? '#e67e22' : '#2ecc71')
+                    .setDescription(
+                        `Вы перевели **${selectedExam.cost} EXP** за экзамен **${selectedExam.label}**.\n\n` +
+                        `• Инструктор <@${selectedInstructorId}> получил: **${instructorExp} EXP**\n` +
+                        `• В банк отправлено: **${bankExp} EXP**\n` +
+                        `• Ваш начальный баланс: **${result.studentInitialExp} EXP**\n` +
+                        `• Ваш остаток: **${result.studentExpLeft} EXP**` +
+                        rankNotice
+                    );
+
+                await i.editReply({ content: '', embeds: [successEmbed], components: [] });
+                collector.stop('completed');
+
+                // Логирование и отправка в канал экзаменаторов
+                try {
+                    const examChannel = i.client.channels.cache.get(EXAMINERS_CHANNEL_ID) || 
+                                        await i.client.channels.fetch(EXAMINERS_CHANNEL_ID).catch(() => null);
+
+                    if (examChannel && examChannel.type === ChannelType.GuildText) {
+                        const publicEmbed = new EmbedBuilder()
+                            .setTitle('🎓 Подтверждение оплаты экзамена')
+                            .setColor('#3498db')
+                            .setDescription(
+                                `Курсант <@${i.user.id}> успешно оплатил экзамен **${selectedExam.label}**.\n` +
+                                `Инструктору <@${selectedInstructorId}> начислено **${instructorExp} EXP**.`
+                            )
+                            .addFields(
+                                { name: 'Сумма экзамена', value: `${selectedExam.cost} EXP`, inline: true },
+                                { name: 'Остаток у курсанта', value: `${result.studentExpLeft} EXP`, inline: true },
+                                ...(result.rankChanged ? [{ name: '🔻 Изменение звания', value: `\`${result.oldRank}\` ➔ \`${result.newRank}\``, inline: false }] : [])
+                            )
+                            .setTimestamp();
+
+                        await examChannel.send({
+                            content: `🔔 Инструктор <@${selectedInstructorId}>, вам поступила оплата экзамена!`,
+                            embeds: [publicEmbed]
+                        });
+                    }
+                } catch (err) {
+                    console.error('Ошибка отправки в канал экзаменаторов:', err);
+                }
+
+                await sendAdminLog({
+                    title: '💳 Оплата экзамена',
+                    description: `Курсант <@${i.user.id}> перевел опыт инструктору <@${selectedInstructorId}>.`,
+                    color: result.rankChanged ? '#e67e22' : '#2ecc71',
+                    executorId: i.user.id,
+                    fields: [
+                        { name: 'Экзамен', value: selectedExam.label, inline: true },
+                        { name: 'Стоимость', value: `${selectedExam.cost} EXP`, inline: true },
+                        { name: 'Инструктор получил', value: `${instructorExp} EXP`, inline: true },
+                        { name: 'В банк', value: `${bankExp} EXP`, inline: true },
+                        { name: 'Баланс до/после', value: `${result.studentInitialExp} ➔ ${result.studentExpLeft} EXP`, inline: false },
+                        ...(result.rankChanged ? [{ name: 'Понижение звания', value: `\`${result.oldRank}\` ➔ \`${result.newRank}\``, inline: false }] : [])
+                    ]
+                });
+
+                updateBankDisplay(i.client);
+
+            } else {
+                let errorMsg = '💥 Произошла непредвиденная ошибка.';
+                if (result.error === 'STUDENT_NOT_FOUND') {
+                    errorMsg = '❌ Ваш профиль не найден в базе данных (не привязан Discord)!';
+                } else if (result.error === 'INSTRUCTOR_NOT_FOUND') {
+                    errorMsg = '❌ Профиль инструктора не найден в базе данных (не привязан Discord)!';
+                } else if (result.error === 'NOT_ENOUGH_EXP') {
+                    errorMsg = '❌ У вас недостаточно опыта даже при максимально возможном понижении звания!';
+                }
+
+                await i.editReply({ content: errorMsg, embeds: [], components: [] });
+                collector.stop('error');
             }
         }
     });
@@ -295,7 +328,7 @@ export default async function (interaction: Interaction) {
     });
 }
 
-// Вспомогательные функции
+// Вспомогательные функции отрисовки и сборки компонента
 
 function createCategoryButtons() {
     const row = new ActionRowBuilder<ButtonBuilder>();
@@ -310,15 +343,64 @@ function createCategoryButtons() {
         );
     });
 
-    // Кнопка возврата к выбору инструктора
-    row.addComponents(
+    return [row];
+}
+
+async function buildInstructorStepComponents(interaction: RepliableInteraction, categoryId: string) {
+    if (!interaction.inCachedGuild()) {
+        return { content: '❌ Ошибка гильдии.', components: [] };
+    }
+
+    const category = EXAM_DATA[categoryId];
+    const categoryLabel = category ? category.label : categoryId;
+    const requiredRoleId = getRequiredInstructorRoleId(categoryId);
+
+    let eligibleMembers: GuildMember[] = [];
+    if (requiredRoleId) {
+        const role = await interaction.guild.roles.fetch(requiredRoleId).catch(() => null);
+        if (role) {
+            eligibleMembers = Array.from(role.members.values()).filter(m => !m.user.bot);
+        }
+    }
+
+    if (eligibleMembers.length === 0) {
+        const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId('back_to_step1')
+                .setLabel('⬅️ Назад к категориям')
+                .setStyle(ButtonStyle.Secondary)
+        );
+        return {
+            content: `📂 Категория: **${categoryLabel}**\n❌ **В данной категории пока нет доступных инструкторов на сервере!**`,
+            components: [backRow],
+        };
+    }
+
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('select_instructor')
+        .setPlaceholder('Выберите квалифицированного инструктора...')
+        .addOptions(
+            eligibleMembers.slice(0, 25).map(member => 
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(member.displayName)
+                    .setValue(member.id)
+                    .setDescription(`Ник: ${member.user.username}`)
+            )
+        );
+
+    const menuRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+    
+    const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId('back_to_step1')
-            .setLabel('⬅️ Сменить инструктора')
+            .setLabel('⬅️ Сменить категорию')
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return [row];
+    return {
+        content: `📂 Категория: **${categoryLabel}**\n👤 **Шаг 2 из 3:** Выберите инструктора с соответствующей ролью:`,
+        components: [menuRow, backRow],
+    };
 }
 
 function createExamButtons(items: ExamItem[]) {
@@ -332,11 +414,10 @@ function createExamButtons(items: ExamItem[]) {
         );
     });
 
-    // Кнопка возврата к категориям
     row.addComponents(
         new ButtonBuilder()
             .setCustomId('back_to_step2')
-            .setLabel('⬅️ Назад к категориям')
+            .setLabel('⬅️ Назад к инструкторам')
             .setStyle(ButtonStyle.Secondary)
     );
 

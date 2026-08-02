@@ -1,3 +1,5 @@
+import { ROLES_CONFIG } from "./rolesConfig";
+
 export interface ExamItem {
     id: string;
     label: string;
@@ -51,3 +53,20 @@ export const EXAM_DATA: Record<string, ExamCategory> = {
         ],
     },
 };
+
+export function getRequiredInstructorRoleId(categoryId: string): string | null {
+    const roles = ROLES_CONFIG.kmb;
+    
+    switch (categoryId) {
+        case 'vvs':
+            return roles[0] ?? null; // Инструктор Лётчиков (ВВС)
+        case 'btv':
+            return roles[1] ?? null; // Инструктор Танкистов (БТВ)
+        case 'factions':
+            return roles[2] ?? null; // Инструктор РП сторон
+        case 'courses':
+            return ROLES_CONFIG.categoryInstructorsRoleId ?? null; 
+        default:
+            return null;
+    }
+}

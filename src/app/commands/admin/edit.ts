@@ -4,7 +4,6 @@ import { openEditPanel } from '@/services/adminEditService';
 import { isOperator } from '@/database/queries';
 
 export const metadata: CommandMetadata = {
-    userPermissions: 'Administrator',
     guilds: [process.env.GUILD_ID as string]
 };
 

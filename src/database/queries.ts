@@ -61,6 +61,24 @@ export interface UnitData {
     dRoleID: string | null;
 }
 
+export interface ExamPaymentResult {
+    success: boolean;
+    error?: string;
+    studentInitialExp?: number;
+    studentExpLeft?: number;
+    rankChanged?: boolean;
+    oldRank?: string;
+    newRank?: string;
+}
+
+export interface RankDemotionPreview {
+    willDemote: boolean;
+    oldRank: string;
+    newRank: string;
+    finalExp: number;
+    insufficientExp?: boolean;
+}
+
 // Количество игроков на сервере
 export async function getOnlineCount() {
     const [rows] = await sequelize.query(`
@@ -169,119 +187,149 @@ export async function processExamPayment(
     studentDiscordId: string,
     instructorDiscordId: string,
     cost: number
-): Promise<TransferResult> {
+): Promise<ExamPaymentResult> {
     const transaction: Transaction = await sequelize.transaction();
 
     try {
-        // 1. Находим курсанта
-        const students = await sequelize.query<PlayerInfo>(
-            `SELECT * FROM players WHERE DiscID = :studentDiscordId AND DiscID IS NOT NULL AND DiscID != '0' AND DiscID != '' LIMIT 1`,
-            { 
-                replacements: { studentDiscordId }, 
-                type: QueryTypes.SELECT,
-                transaction 
-            }
+        // 1. Поиск курсанта и инструктора
+        const [students] = await sequelize.query(
+            `SELECT * FROM players WHERE DiscID = :studentDiscordId LIMIT 1`,
+            { replacements: { studentDiscordId }, transaction }
         );
-        const student = students[0];
+
+        const [instructors] = await sequelize.query(
+            `SELECT * FROM players WHERE DiscID = :instructorDiscordId LIMIT 1`,
+            { replacements: { instructorDiscordId }, transaction }
+        );
+
+        const student = (students as any[])[0];
+        const instructor = (instructors as any[])[0];
 
         if (!student) {
             await transaction.rollback();
             return { success: false, error: 'STUDENT_NOT_FOUND' };
         }
 
-        // 2. Находим инструктора
-        const instructors = await sequelize.query<PlayerInfo>(
-            `SELECT * FROM players WHERE DiscID = :instructorDiscordId AND DiscID IS NOT NULL AND DiscID != '0' AND DiscID != '' LIMIT 1`,
-            { 
-                replacements: { instructorDiscordId }, 
-                type: QueryTypes.SELECT,
-                transaction 
-            }
-        );
-        const instructor = instructors[0];
-
         if (!instructor) {
             await transaction.rollback();
             return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
         }
 
-        let newExp = student.pExp - cost;
-        let newRank = student.pLvl;
+        const studentInitialExp = Number(student.pExp) || 0;
+        let currentExp = studentInitialExp - cost;
+        let currentRankName = student.pLvl;
+        const oldRank = currentRankName;
         let rankChanged = false;
-        const initialExp = student.pExp;
 
-        // Расчет понижения ранга при отрицательном балансе
-        if (newExp < 0) {
-            let deficit = Math.abs(newExp);
-            let currentRankIndex = RANKS_DATA.findIndex(
-                r => r.name === student.pLvl || r.shortName === student.pLvl || r.fullName === student.pLvl
+        // 2. Логика понижения звания, если pExp уйдет в минус
+        while (currentExp < 0) {
+            // Ищем текущий ранг в массиве
+            const currentRankIndex = RANKS_DATA.findIndex(
+                (r) => r.name === currentRankName || r.fullName === currentRankName || r.shortName === currentRankName
             );
 
-            if (currentRankIndex === -1) {
-                currentRankIndex = 1; // Рядовой
-            }
-
-            while (deficit > 0 && currentRankIndex > 0) {
-                const currentRank = RANKS_DATA[currentRankIndex];
-                const currentRankExpRequirement = currentRank ? currentRank.exp : 0;
-
-                if (deficit <= currentRankExpRequirement) {
-                    currentRankIndex--;
-                    newExp = currentRankExpRequirement - deficit;
-                    deficit = 0;
-                } else {
-                    deficit -= currentRankExpRequirement;
-                    currentRankIndex--;
-                }
-            }
-
-            if (deficit > 0 && currentRankIndex === 0) {
+            // Если это самый первый ранг (Новобранец/Дух) или ранг не найден — уходить ниже некуда
+            if (currentRankIndex <= 0) {
                 await transaction.rollback();
                 return { success: false, error: 'NOT_ENOUGH_EXP' };
             }
 
-            const targetRank = RANKS_DATA[currentRankIndex];
-            newRank = targetRank ? targetRank.name : student.pLvl;
-            rankChanged = newRank !== student.pLvl;
+            // Берем предыдущий ранг
+            const prevRank = RANKS_DATA[currentRankIndex - 1];
+            
+            if (!prevRank) {
+                break;
+            }
+
+            currentExp = prevRank.exp + currentExp; 
+            currentRankName = prevRank.name;
+            rankChanged = true;
         }
 
-        const instructorExp = Math.floor(cost * 0.8);
-        const bankExp = Math.ceil(cost * 0.2);
+        // 3. Расчет для инструктора и банка (80% / 20%)
+        const instructorAddExp = Math.floor(cost * 0.8);
+        const bankAddExp = Math.ceil(cost * 0.2);
 
-        // 3. Обновляем EXP и звание курсанта
+        // 4. Обновление баланса курсанта
         await sequelize.query(
-            `UPDATE players SET pExp = :newExp, pLvl = :newRank WHERE pUID = :pUID`,
-            { replacements: { newExp, newRank, pUID: student.pUID }, transaction }
+            `UPDATE players SET pExp = :currentExp, pLvl = :currentRankName WHERE pUID = :pUID`,
+            {
+                replacements: { currentExp, currentRankName, pUID: student.pUID },
+                transaction,
+            }
         );
 
-        // 4. Начисляем EXP инструктору
+        // 5. Начисление опыта инструктору
         await sequelize.query(
-            `UPDATE players SET pExp = pExp + :instructorExp WHERE pUID = :pUID`,
-            { replacements: { instructorExp, pUID: instructor.pUID }, transaction }
+            `UPDATE players SET pExp = pExp + :instructorAddExp WHERE pUID = :pUID`,
+            {
+                replacements: { instructorAddExp, pUID: instructor.pUID },
+                transaction,
+            }
         );
 
-        // 5. Пополняем банк
+        // 6. Начисление комиссии в банк
         await sequelize.query(
-            `INSERT INTO bank (id, expBank) VALUES (1, :bankExp) 
-            ON DUPLICATE KEY UPDATE expBank = expBank + :bankExp`,
-            { replacements: { bankExp }, transaction }
+            `UPDATE bank SET expBank = expBank + :bankAddExp`,
+            {
+                replacements: { bankAddExp },
+                transaction,
+            }
         );
 
         await transaction.commit();
 
         return {
             success: true,
-            studentInitialExp: initialExp,
-            studentExpLeft: newExp,
+            studentInitialExp,
+            studentExpLeft: currentExp,
             rankChanged,
-            oldRank: student.pLvl,
-            newRank
+            oldRank,
+            newRank: currentRankName,
         };
     } catch (error) {
         await transaction.rollback();
-        console.error('Ошибка при проведении транзакции экзамена:', error);
-        return { success: false, error: 'UNKNOWN_ERROR' };
+        console.error('Ошибка при проведении оплаты экзамена:', error);
+        return { success: false, error: 'DATABASE_ERROR' };
     }
+}
+
+export function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number): RankDemotionPreview {
+    let expLeft = currentExp - cost;
+    let rankName = currentRankName;
+    const initialRank = currentRankName;
+    let rankChanged = false;
+
+    while (expLeft < 0) {
+        const currentRankIndex = RANKS_DATA.findIndex(
+            (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
+        );
+
+        if (currentRankIndex <= 0) {
+            return {
+                willDemote: false,
+                oldRank: initialRank,
+                newRank: rankName,
+                finalExp: expLeft,
+                insufficientExp: true, // Вообще не хватает опыта даже с деградацией
+            };
+        }
+
+        const prevRank = RANKS_DATA[currentRankIndex - 1];
+        if (!prevRank) break;
+
+        expLeft = prevRank.exp + expLeft;
+        rankName = prevRank.name;
+        rankChanged = true;
+    }
+
+    return {
+        willDemote: rankChanged,
+        oldRank: initialRank,
+        newRank: rankName,
+        finalExp: expLeft,
+        insufficientExp: false,
+    };
 }
 
 // Получение последнего необработанного ЗБД (dCheck = 0)
