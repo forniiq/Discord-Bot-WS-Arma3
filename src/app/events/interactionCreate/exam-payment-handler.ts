@@ -357,7 +357,9 @@ async function buildInstructorStepComponents(interaction: RepliableInteraction, 
 
     let eligibleMembers: GuildMember[] = [];
     if (requiredRoleId) {
-        const role = await interaction.guild.roles.fetch(requiredRoleId).catch(() => null);
+        await interaction.guild.members.fetch().catch(() => null);
+
+        const role = await interaction.guild.roles.fetch(requiredRoleId, { force: true }).catch(() => null);
         if (role) {
             eligibleMembers = Array.from(role.members.values()).filter(m => !m.user.bot);
         }

@@ -3,7 +3,6 @@ import { ApplicationCommandType } from 'discord.js';
 import { openEditPanel } from '@/services/adminEditService';
 
 export const metadata: CommandMetadata = {
-    userPermissions: 'Administrator',
     guilds: [process.env.GUILD_ID as string]
 };
 
