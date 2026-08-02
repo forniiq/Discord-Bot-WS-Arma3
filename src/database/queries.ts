@@ -71,12 +71,12 @@ export interface ExamPaymentResult {
     newRank?: string;
 }
 
-export interface RankDemotionPreview {
+interface DemotionResult {
     willDemote: boolean;
     oldRank: string;
     newRank: string;
     finalExp: number;
-    insufficientExp?: boolean;
+    insufficientExp: boolean;
 }
 
 // Количество игроков на сервере
@@ -183,142 +183,51 @@ export async function findAllSyncablePlayers(): Promise<PlayerInfo[]> {
     return rows as PlayerInfo[];
 }
 
-export async function processExamPayment(
-    studentDiscordId: string,
-    instructorDiscordId: string,
-    cost: number
-): Promise<ExamPaymentResult> {
-    const transaction: Transaction = await sequelize.transaction();
-
-    try {
-        // 1. Поиск курсанта и инструктора
-        const [students] = await sequelize.query(
-            `SELECT * FROM players WHERE DiscID = :studentDiscordId LIMIT 1`,
-            { replacements: { studentDiscordId }, transaction }
-        );
-
-        const [instructors] = await sequelize.query(
-            `SELECT * FROM players WHERE DiscID = :instructorDiscordId LIMIT 1`,
-            { replacements: { instructorDiscordId }, transaction }
-        );
-
-        const student = (students as any[])[0];
-        const instructor = (instructors as any[])[0];
-
-        if (!student) {
-            await transaction.rollback();
-            return { success: false, error: 'STUDENT_NOT_FOUND' };
-        }
-
-        if (!instructor) {
-            await transaction.rollback();
-            return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
-        }
-
-        const studentInitialExp = Number(student.pExp) || 0;
-        let currentExp = studentInitialExp - cost;
-        let currentRankName = student.pLvl;
-        const oldRank = currentRankName;
-        let rankChanged = false;
-
-        // 2. Логика понижения звания, если pExp уйдет в минус
-        while (currentExp < 0) {
-            // Ищем текущий ранг в массиве
-            const currentRankIndex = RANKS_DATA.findIndex(
-                (r) => r.name === currentRankName || r.fullName === currentRankName || r.shortName === currentRankName
-            );
-
-            // Если это самый первый ранг (Новобранец/Дух) или ранг не найден — уходить ниже некуда
-            if (currentRankIndex <= 0) {
-                await transaction.rollback();
-                return { success: false, error: 'NOT_ENOUGH_EXP' };
-            }
-
-            // Берем предыдущий ранг
-            const prevRank = RANKS_DATA[currentRankIndex - 1];
-            
-            if (!prevRank) {
-                break;
-            }
-
-            currentExp = prevRank.exp + currentExp; 
-            currentRankName = prevRank.name;
-            rankChanged = true;
-        }
-
-        // 3. Расчет для инструктора и банка (80% / 20%)
-        const instructorAddExp = Math.floor(cost * 0.8);
-        const bankAddExp = Math.ceil(cost * 0.2);
-
-        // 4. Обновление баланса курсанта
-        await sequelize.query(
-            `UPDATE players SET pExp = :currentExp, pLvl = :currentRankName WHERE pUID = :pUID`,
-            {
-                replacements: { currentExp, currentRankName, pUID: student.pUID },
-                transaction,
-            }
-        );
-
-        // 5. Начисление опыта инструктору
-        await sequelize.query(
-            `UPDATE players SET pExp = pExp + :instructorAddExp WHERE pUID = :pUID`,
-            {
-                replacements: { instructorAddExp, pUID: instructor.pUID },
-                transaction,
-            }
-        );
-
-        // 6. Начисление комиссии в банк
-        await sequelize.query(
-            `UPDATE bank SET expBank = expBank + :bankAddExp`,
-            {
-                replacements: { bankAddExp },
-                transaction,
-            }
-        );
-
-        await transaction.commit();
-
-        return {
-            success: true,
-            studentInitialExp,
-            studentExpLeft: currentExp,
-            rankChanged,
-            oldRank,
-            newRank: currentRankName,
-        };
-    } catch (error) {
-        await transaction.rollback();
-        console.error('Ошибка при проведении оплаты экзамена:', error);
-        return { success: false, error: 'DATABASE_ERROR' };
-    }
-}
-
-export function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number): RankDemotionPreview {
-    let expLeft = currentExp - cost;
+function calculateRankDemotion(currentExp: number, currentRankName: string, cost: number): DemotionResult {
+    let totalExpAvailable = currentExp;
     let rankName = currentRankName;
     const initialRank = currentRankName;
     let rankChanged = false;
 
-    while (expLeft < 0) {
-        const currentRankIndex = RANKS_DATA.findIndex(
-            (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
-        );
+    let currentRankIndex = RANKS_DATA.findIndex(
+        (r) => r.name === rankName || r.fullName === rankName || r.shortName === rankName
+    );
 
+    if (currentRankIndex === -1) currentRankIndex = 0;
+
+    let remainingCost = cost - totalExpAvailable;
+
+    if (remainingCost <= 0) {
+        return {
+            willDemote: false,
+            oldRank: initialRank,
+            newRank: initialRank,
+            finalExp: totalExpAvailable - cost,
+            insufficientExp: false,
+        };
+    }
+
+    while (remainingCost > 0) {
         if (currentRankIndex <= 0) {
             return {
                 willDemote: false,
                 oldRank: initialRank,
-                newRank: rankName,
-                finalExp: expLeft,
-                insufficientExp: true, // Вообще не хватает опыта даже с деградацией
+                newRank: initialRank,
+                finalExp: totalExpAvailable - cost,
+                insufficientExp: true,
             };
         }
 
-        const prevRank = RANKS_DATA[currentRankIndex - 1];
-        if (!prevRank) break;
+        currentRankIndex--;
+        const prevRank = RANKS_DATA[currentRankIndex];
+        
+        // Защита от undefined для TypeScript
+        if (!prevRank) {
+            break;
+        }
 
-        expLeft = prevRank.exp + expLeft;
+        totalExpAvailable += prevRank.exp;
+        remainingCost = cost - totalExpAvailable;
         rankName = prevRank.name;
         rankChanged = true;
     }
@@ -327,8 +236,45 @@ export function calculateRankDemotion(currentExp: number, currentRankName: strin
         willDemote: rankChanged,
         oldRank: initialRank,
         newRank: rankName,
-        finalExp: expLeft,
+        finalExp: Math.abs(remainingCost),
         insufficientExp: false,
+    };
+}
+
+export async function processExamPayment(studentDiscordId: string, instructorDiscordId: string, cost: number) {
+    const student = await findPlayer({ discordId: studentDiscordId });
+    const instructor = await findPlayer({ discordId: instructorDiscordId });
+
+    if (!student || !student.DiscID) return { success: false, error: 'STUDENT_NOT_FOUND' };
+    if (!instructor || !instructor.DiscID) return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
+
+    const demotion: DemotionResult = calculateRankDemotion(Number(student.pExp) || 0, student.pLvl, cost);
+
+    if (demotion.insufficientExp) {
+        return { success: false, error: 'NOT_ENOUGH_EXP' };
+    }
+
+    const initialExp = student.pExp;
+    const instructorReward = Math.floor(cost * 0.8);
+
+    // Используем проверенные studentDiscordId / instructorDiscordId 
+    // либо гарантированное обращение к student.DiscID
+    await updatePlayerField(student.DiscID, 'pExp', demotion.finalExp);
+    if (demotion.willDemote) {
+        await updatePlayerField(student.DiscID, 'pLvl', demotion.newRank);
+    }
+
+    // Начисляем опыт инструктору
+    const newInstructorExp = (Number(instructor.pExp) || 0) + instructorReward;
+    await updatePlayerField(instructor.DiscID, 'pExp', newInstructorExp);
+
+    return {
+        success: true,
+        rankChanged: demotion.willDemote,
+        oldRank: demotion.oldRank,
+        newRank: demotion.newRank,
+        studentInitialExp: initialExp,
+        studentExpLeft: demotion.finalExp
     };
 }
 
