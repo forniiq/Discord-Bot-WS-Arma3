@@ -3,7 +3,7 @@
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger";
 import { getOnlinePlayers, OnlinePlayer, getCurrentZbd, ZBDInfo } from "@/database/queries";
-import { APPROVED_UNITS } from "@/config/units";
+import { getApprovedUnitsSet } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
 
 // Пик онлайна за день
@@ -177,8 +177,9 @@ function getPlayerUnit(name: string): string | null {
     }
 
     const unit = match[1].trim();
+    const approvedUnits = getApprovedUnitsSet();
 
-    return APPROVED_UNITS.has(unit)
+    return approvedUnits.has(unit)
         ? unit
         : null;
 }
