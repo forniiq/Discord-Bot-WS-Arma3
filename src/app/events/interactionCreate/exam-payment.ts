@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import { EXAM_DATA, getRequiredInstructorRoleId, ExamItem } from '@/config/exams';
 import { RANKS_DATA } from '@/config/ranks';
-import { processExamTransaction } from '@/database/queries';
+import { processExamTransaction, getPlayerExpData } from '@/database/queries';
 import { updateBankDisplay } from '@/services/bank.service';
 
 const INSTRUCTORS_CHAT_ID = process.env.INSTRUCTORS_CHAT_ID as string;
@@ -18,19 +18,49 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
     // 1. Нажатие кнопки "💳 Оплатить экзамен"
     if (interaction.isButton() && interaction.customId === 'btn_start_exam_pay') {
+        const student = await getPlayerExpData(interaction.user.id);
+        if (!student) {
+            return void await interaction.reply({ 
+                content: '❌ Ваш профиль не найден в базе данных! Сначала зарегистрируйтесь или синхронизируйте профиль.', 
+                ephemeral: true 
+            });
+        }
+
+        const rankInfo = RANKS_DATA[student.pLvl] ?? { name: 'Неизвестно', exp: 100 };
+        const nextRankInfo = RANKS_DATA[student.pLvl + 1];
+        
+        // Красивый прогресс-бар опыта
+        const progressPercent = nextRankInfo && nextRankInfo.exp > 0 
+            ? Math.min(Math.floor((student.pExp / nextRankInfo.exp) * 100), 100) 
+            : 100;
+        const filledBlocks = Math.floor(progressPercent / 10);
+        const progressBar = '█'.repeat(filledBlocks) + '░'.repeat(10 - filledBlocks);
+
+        const embed = new EmbedBuilder()
+            .setTitle('💳 Терминал оплаты экзаменов & курсов')
+            .setColor('#3498db')
+            .setDescription('Добро пожаловать в систему аттестации **War Spectra**.\nВыберите нужную категорию экзамена в меню ниже.')
+            .addFields(
+                { name: '🪖 Ваш текущий статус', value: `**Звание:** ${rankInfo.name}\n**Опыт:** \`${student.pExp} EXP\``, inline: false },
+                { name: `📈 Прогресс до ранга: ${nextRankInfo?.name || 'Максимум'}`, value: `\`[${progressBar}]\` **${progressPercent}%**`, inline: false }
+            )
+            .setFooter({ text: 'Шаг 1 из 3 • Выберите категорию экзамена' })
+            .setTimestamp();
+
         const categoryMenu = new StringSelectMenuBuilder()
             .setCustomId('select_exam_category')
-            .setPlaceholder('Выберите категорию экзамена...')
+            .setPlaceholder('📂 Выберите категорию экзамена...')
             .addOptions(
                 Object.values(EXAM_DATA).map(cat => ({
                     label: cat.label,
-                    value: cat.id
+                    value: cat.id,
+                    description: `Курсов в категории: ${cat.items.length}`
                 }))
             );
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(categoryMenu);
         return void await interaction.reply({ 
-            content: 'Шаг 1/3: Выберите категорию:', 
+            embeds: [embed], 
             components: [row], 
             ephemeral: true 
         });
@@ -43,22 +73,37 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         const category = EXAM_DATA[categoryId];
         if (!category) {
-            return void await interaction.reply({ content: 'Категория не найдена.', ephemeral: true });
+            return void await interaction.update({ content: '❌ Категория не найдена.', components: [] });
         }
+
+        const student = await getPlayerExpData(interaction.user.id);
+        const rankInfo = student ? (RANKS_DATA[student.pLvl]?.name ?? 'Неизвестно') : 'Неизвестно';
+
+        const embed = new EmbedBuilder()
+            .setTitle(`💳 Выбор курса: ${category.label}`)
+            .setColor('#f39c12')
+            .setDescription(`Категория успешно выбрана. Теперь выберите конкретный курс или допуск из списка ниже.`)
+            .addFields(
+                { name: '👤 Боец', value: `<@${interaction.user.id}> (${rankInfo})`, inline: true },
+                { name: '📂 Категория', value: category.label, inline: true }
+            )
+            .setFooter({ text: 'Шаг 2 из 3 • Выберите сдаваемый курс/допуск' })
+            .setTimestamp();
 
         const itemMenu = new StringSelectMenuBuilder()
             .setCustomId(`select_exam_item:${categoryId}`)
-            .setPlaceholder('Выберите сдаваемый курс/допуск...')
+            .setPlaceholder('🎯 Выберите сдаваемый курс / допуск...')
             .addOptions(
                 category.items.map((item: ExamItem) => ({
-                    label: `${item.label} — ${item.cost} EXP`,
-                    value: item.id
+                    label: item.label,
+                    value: item.id,
+                    description: `Стоимость: ${item.cost} EXP`
                 }))
             );
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(itemMenu);
         return void await interaction.update({ 
-            content: `Шаг 2/3: Категория **${category.label}**. Выберите экзамен:`, 
+            embeds: [embed], 
             components: [row] 
         });
     }
@@ -73,8 +118,8 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         const category = EXAM_DATA[categoryId];
         const item = category?.items.find((i: ExamItem) => i.id === itemId);
-        if (!item) {
-            return void await interaction.reply({ content: 'Экзамен не найден.', ephemeral: true });
+        if (!item || !category) {
+            return void await interaction.update({ content: '❌ Экзамен не найден.', components: [] });
         }
 
         const requiredRoleId = getRequiredInstructorRoleId(categoryId, itemId);
@@ -88,15 +133,36 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         }
 
         if (instructors.size === 0) {
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('❌ Инструкторы не найдены')
+                .setColor('#e74c3c')
+                .setDescription('На сервере в данный момент нет инструкторов с подходящей ролью для принятия этого экзамена.')
+                .setTimestamp();
+
             return void await interaction.update({ 
-                content: '❌ К сожалению, на сервере сейчас нет инструкторов с подходящей ролью для принятия этого экзамена.', 
+                embeds: [errorEmbed], 
                 components: [] 
             });
         }
 
+        const student = await getPlayerExpData(interaction.user.id);
+        const hasEnoughExp = student ? student.pExp >= item.cost || student.pLvl > 0 : true; // Базовая проверка
+
+        const embed = new EmbedBuilder()
+            .setTitle(`💳 Оплата экзамена: ${item.label}`)
+            .setColor('#9b59b6')
+            .setDescription(`Остался финальный шаг! Выберите инструктора, который принял у вас экзамен.`)
+            .addFields(
+                { name: '🎯 Экзамен', value: item.label, inline: true },
+                { name: '💎 Стоимость', value: `**${item.cost} EXP**`, inline: true },
+                { name: '⚠️ Баланс', value: student ? `${student.pExp} EXP (Звание: ${RANKS_DATA[student.pLvl]?.name})` : 'Нет данных', inline: false }
+            )
+            .setFooter({ text: 'Шаг 3 из 3 • Выберите принявшего инструктора' })
+            .setTimestamp();
+
         const instructorMenu = new StringSelectMenuBuilder()
             .setCustomId(`select_instructor:${categoryId}:${itemId}`)
-            .setPlaceholder('Выберите инструктора, принявшего экзамен...')
+            .setPlaceholder('👤 Выберите инструктора...')
             .addOptions(
                 instructors.map(inst => ({
                     label: inst.displayName,
@@ -107,7 +173,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(instructorMenu);
         return void await interaction.update({ 
-            content: `Шаг 3/3: Экзамен **${item.label}** (${item.cost} EXP). Выберите инструктора:`, 
+            embeds: [embed], 
             components: [row] 
         });
     }
@@ -145,17 +211,39 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                 'INSTRUCTOR_NOT_FOUND': '❌ Профиль выбранного инструктора не найден в базе данных!',
                 'DB_ERROR': '❌ Произошла ошибка при проведении транзакции в БД.'
             };
+            const errEmbed = new EmbedBuilder()
+                .setTitle('❌ Ошибка транзакции')
+                .setColor('#e74c3c')
+                .setDescription(errorMessages[res.error ?? 'DB_ERROR'] ?? '❌ Произошла ошибка.')
+                .setTimestamp();
+
             return void await interaction.update({ 
-                content: errorMessages[res.error ?? 'DB_ERROR'] ?? '❌ Произошла ошибка.', 
+                embeds: [errEmbed], 
                 components: [] 
             });
         }
 
-        // Обновляем счетчик банка в Discord (приведение client к any убирает конфликт Client<true> vs Client)
+        // Обновляем счетчик банка в Discord
         updateBankDisplay(client as any).catch(console.error);
 
+        // Красивый финальный Embed для игрока
+        const studentNewRankName = res.studentResult ? (RANKS_DATA[res.studentResult.newLvl]?.name ?? 'Неизвестно') : 'Неизвестно';
+        const successEmbed = new EmbedBuilder()
+            .setTitle('✅ Экзамен успешно оплачен!')
+            .setColor('#2ecc71')
+            .setDescription(`Вы успешно прошли аттестацию по курсу **${item.label}**.\nСредства списаны с вашего баланса, инструктор получил вознаграждение, а налог отправлен в казну банка.`)
+            .addFields(
+                { name: '📚 Сданный курс', value: item.label, inline: false },
+                { name: '💸 Списано с вас', value: `**-${item.cost} EXP**`, inline: true },
+                { name: '🎖 Ваше новое звание', value: `${studentNewRankName} (${res.studentResult?.newExp} EXP)`, inline: true },
+                { name: '👤 Инструктор', value: `<@${instructorId}>`, inline: true },
+                { name: '💰 Налог в Банк', value: `+${taxAmount} EXP (${taxPercent}%)`, inline: true }
+            )
+            .setFooter({ text: 'War Spectra • Система аттестации' })
+            .setTimestamp();
+
         await interaction.update({ 
-            content: `✅ Оплата за экзамен **${item.label}** прошла успешно!\nСписано: **${item.cost} EXP** (Инструктор: **+${instructorReward} EXP**, Банк: **+${taxAmount} EXP**).`, 
+            embeds: [successEmbed], 
             components: [] 
         });
 

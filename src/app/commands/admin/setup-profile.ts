@@ -60,8 +60,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             '> *ℹ️ Информация выводится в реальном времени напрямую из боевой базы данных сервера.*'
         )
         .setColor('#10b981') // Насыщенный тактический зеленый
-        .setImage('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop') // Атмосферный баннер (можно заменить на свою картинку)
-        .setFooter({ text: 'War Spectra Security Service • Secure Terminal v2.4' })
+        .setFooter({ text: 'War Spectra' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
