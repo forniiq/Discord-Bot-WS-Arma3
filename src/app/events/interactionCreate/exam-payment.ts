@@ -289,24 +289,40 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         // Отправка отчета в чат инструкторов
         if (INSTRUCTORS_CHAT_ID) {
-            const fetchedChannel = await client.channels.fetch(INSTRUCTORS_CHAT_ID).catch(() => null);
-            if (fetchedChannel && fetchedChannel.isTextBased() && 'send' in fetchedChannel) {
-                const instChannel = fetchedChannel as unknown as TextChannel;
-                await instChannel.send({
-                    content: `<@${instructorId}>`,
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('🎓 Отчет об экзамене принят')
-                            .setColor('#2ecc71')
-                            .addFields(
-                                { name: 'Курсант', value: `<@${studentDiscId}>`, inline: true },
-                                { name: 'Инструктор', value: `<@${instructorId}>`, inline: true },
-                                { name: 'Курс', value: item.label, inline: true },
-                                { name: 'Награда', value: `+${instructorReward} EXP`, inline: true }
-                            )
-                            .setTimestamp()
-                    ]
-                });
+            try {
+                const fetchedChannel = await client.channels.fetch(INSTRUCTORS_CHAT_ID).catch(() => null);
+                if (fetchedChannel && fetchedChannel.isTextBased() && 'send' in fetchedChannel) {
+                    const instChannel = fetchedChannel as unknown as TextChannel;
+                    
+                    let textBonus = '';
+                    if (res.instructorResult?.rankChanged) {
+                        const oldRankName = RANKS_DATA[res.instructorResult.oldLvl]?.name ?? 'Неизвестно';
+                        const newRankName = RANKS_DATA[res.instructorResult.newLvl]?.name ?? 'Неизвестно';
+                        textBonus = `\n🎉 **Инструктор повышен в звании:** ${oldRankName} ➔ **${newRankName}**!`;
+                    }
+
+                    await instChannel.send({
+                        content: `<@${instructorId}>`,
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle('🎓 Оплата за экзамен получена!')
+                                .setColor('#2ecc71')
+                                .addFields(
+                                    { name: 'Ученик', value: `<@${studentDiscId}>`, inline: true },
+                                    { name: 'Инструктор', value: `<@${instructorId}>`, inline: true },
+                                    { name: 'Экзамен', value: item.label, inline: true },
+                                    { name: 'Начислено инструктору', value: `+${instructorReward} EXP`, inline: true },
+                                    { name: 'Налог в Банк', value: `+${taxAmount} EXP (${taxPercent}%)`, inline: true }
+                                )
+                                .setDescription(textBonus || null)
+                                .setTimestamp()
+                        ]
+                    });
+                } else {
+                    console.warn(`[WARN] Канал инструкторов (ID: ${INSTRUCTORS_CHAT_ID}) не найден или туда нельзя отправить сообщение!`);
+                }
+            } catch (err) {
+                console.error('[ERROR] Ошибка отправки отчета в чат инструкторов:', err);
             }
         }
     }
