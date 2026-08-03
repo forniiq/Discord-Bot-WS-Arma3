@@ -16,7 +16,7 @@ import { updateBankDisplay } from '@/services/bank.service';
 const INSTRUCTORS_CHAT_ID = process.env.INSTRUCTORS_CHAT_ID as string;
 const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string;
 
-// Функция генерации киберпанк-заголовка с прогресс-баром
+// Вспомогательная функция генерации карточки бойца
 async function generateStudentHeader(userId: string, stepInfo: string) {
     const student = await getPlayerExpData(userId);
     const rankInfo = student ? (RANKS_DATA[student.pLvl] ?? { name: 'Рекрут', exp: 100 }) : { name: 'Рекрут', exp: 100 };
@@ -50,10 +50,35 @@ async function generateStudentHeader(userId: string, stepInfo: string) {
     return { embed, student };
 }
 
+// Рендер кнопок категорий (сетка)
+function getCategoryButtons() {
+    const categories = Object.values(EXAM_DATA);
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+    categories.forEach((cat, index) => {
+        if (index > 0 && index % 3 === 0) {
+            rows.push(currentRow);
+            currentRow = new ActionRowBuilder<ButtonBuilder>();
+        }
+        currentRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`exam_cat_${cat.id}`)
+                .setLabel(cat.label)
+                .setStyle(ButtonStyle.Primary)
+        );
+    });
+
+    if (currentRow.components.length > 0) {
+        rows.push(currentRow);
+    }
+    return rows;
+}
+
 const handler: EventHandler<"interactionCreate"> = async (interaction, client) => {
     if (!interaction.guild) return;
 
-    // 1. Открытие главного меню оплаты экзамена из канала
+    // 1. Открытие главного меню оплаты из канала (Reply)
     if (interaction.isButton() && interaction.customId === 'btn_start_exam_pay') {
         const { embed, student } = await generateStudentHeader(interaction.user.id, 'Шаг 1 из 3 • Выберите категорию');
 
@@ -66,73 +91,33 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         embed.setDescription('Выберите категорию интересующего вас направления с помощью интерактивных кнопок ниже:');
 
-        const categories = Object.values(EXAM_DATA);
-        const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-        let currentRow = new ActionRowBuilder<ButtonBuilder>();
-
-        categories.forEach((cat, index) => {
-            if (index > 0 && index % 3 === 0) {
-                rows.push(currentRow);
-                currentRow = new ActionRowBuilder<ButtonBuilder>();
-            }
-            currentRow.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`exam_cat_${cat.id}`)
-                    .setLabel(cat.label)
-                    .setStyle(ButtonStyle.Primary)
-            );
-        });
-
-        if (currentRow.components.length > 0) {
-            rows.push(currentRow);
-        }
-
         return void await interaction.reply({ 
             embeds: [embed], 
-            components: rows as any, 
+            components: getCategoryButtons() as any, 
             flags: MessageFlags.Ephemeral 
         });
     }
 
-    // 2. Кнопка возврата в главное меню категорий
+    // 2. Кнопка возврата в главное меню (Update)
     if (interaction.isButton() && interaction.customId === 'exam_back_to_main') {
+        await interaction.deferUpdate().catch(() => {});
         const { embed } = await generateStudentHeader(interaction.user.id, 'Шаг 1 из 3 • Выберите категорию');
         embed.setDescription('Вы вернулись в главное меню. Выберите категорию экзамена:');
 
-        const categories = Object.values(EXAM_DATA);
-        const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-        let currentRow = new ActionRowBuilder<ButtonBuilder>();
-
-        categories.forEach((cat, index) => {
-            if (index > 0 && index % 3 === 0) {
-                rows.push(currentRow);
-                currentRow = new ActionRowBuilder<ButtonBuilder>();
-            }
-            currentRow.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`exam_cat_${cat.id}`)
-                    .setLabel(cat.label)
-                    .setStyle(ButtonStyle.Primary)
-            );
-        });
-
-        if (currentRow.components.length > 0) {
-            rows.push(currentRow);
-        }
-
-        return void await interaction.update({ 
+        return void await interaction.editReply({ 
             embeds: [embed], 
-            components: rows as any 
+            components: getCategoryButtons() as any 
         });
     }
 
-    // 3. Выбор категории (Нажатие кнопки категории)
+    // 3. Выбор категории (Кнопка категории)
     if (interaction.isButton() && interaction.customId.startsWith('exam_cat_')) {
+        await interaction.deferUpdate().catch(() => {});
         const categoryId = interaction.customId.replace('exam_cat_', '');
         const category = EXAM_DATA[categoryId];
         
         if (!category) {
-            return void await interaction.reply({ content: '❌ Категория не найдена.', flags: MessageFlags.Ephemeral });
+            return void await interaction.editReply({ content: '❌ Категория не найдена.', components: [] });
         }
 
         const { embed } = await generateStudentHeader(interaction.user.id, `Шаг 2 из 3 • Категория: ${category.label}`);
@@ -157,30 +142,31 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return void await interaction.update({ 
+        return void await interaction.editReply({ 
             embeds: [embed], 
             components: [selectRow, backRow] 
         });
     }
 
-    // 4. Выбор конкретного курса / допуска (Выпадающее меню)
+    // 4. Выбор конкретного курса / допуска (Выпадающее меню) -> Выбор инструктора
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_exam_item:')) {
+        await interaction.deferUpdate().catch(() => {});
         const parts = interaction.customId.split(':');
         const categoryId = parts[1];
-        const itemId = parts[2];
+        const itemId = interaction.values[0];
 
         if (!categoryId || !itemId) return;
 
         const category = EXAM_DATA[categoryId];
         const item = category?.items.find((i: ExamItem) => i.id === itemId);
         if (!item || !category) {
-            return void await interaction.update({ content: '❌ Экзамен не найден.', components: [] });
+            return void await interaction.editReply({ content: '❌ Экзамен не найден.', components: [] });
         }
 
         const requiredRoleId = getRequiredInstructorRoleId(categoryId, itemId);
         const guild = interaction.guild;
 
-        // Защита от лимитов (Rate Limit): фильтруем по кэшу без тяжелого guild.members.fetch()
+        // Безопасное получение списка инструкторов из кэша
         let instructors = guild.members.cache.filter(m => !m.user.bot);
         if (requiredRoleId) {
             instructors = instructors.filter(m => m.roles.cache.has(requiredRoleId));
@@ -190,7 +176,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
             const errEmbed = new EmbedBuilder()
                 .setTitle('❌ Инструкторы отсутствуют')
                 .setColor('#e74c3c')
-                .setDescription('В данный момент в кэше нет онлайн-инструкторов с нужной ролью.')
+                .setDescription('В данный момент на сервере нет доступных инструкторов с нужной ролью.')
                 .setTimestamp();
 
             const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -200,7 +186,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                     .setStyle(ButtonStyle.Secondary)
             );
 
-            return void await interaction.update({ 
+            return void await interaction.editReply({ 
                 embeds: [errEmbed], 
                 components: [backRow] 
             });
@@ -217,7 +203,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                     label: inst.displayName.slice(0, 100),
                     value: inst.id,
                     description: `@${inst.user.username}`
-                })).slice(0, 25) // Дискорд разрешает максимум 25 опций
+                })).slice(0, 25)
             );
 
         const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(instructorMenu);
@@ -228,14 +214,15 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return void await interaction.update({ 
+        return void await interaction.editReply({ 
             embeds: [embed], 
             components: [selectRow, backRow] 
         });
     }
 
-    // 5. Финальный выбор инструктора и транзакция
+    // 5. Финальный выбор инструктора и проведение транзакции
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_instructor:')) {
+        await interaction.deferUpdate().catch(() => {});
         const parts = interaction.customId.split(':');
         const categoryId = parts[1];
         const itemId = parts[2];
@@ -267,7 +254,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                 .setDescription('❌ Ошибка проведения операции в базе данных.')
                 .setTimestamp();
 
-            return void await interaction.update({ embeds: [errEmbed], components: [] });
+            return void await interaction.editReply({ embeds: [errEmbed], components: [] });
         }
 
         updateBankDisplay(client as any).catch(console.error);
@@ -287,9 +274,9 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
             .setFooter({ text: 'War Spectra • Система учета' })
             .setTimestamp();
 
-        await interaction.update({ embeds: [successEmbed], components: [] });
+        await interaction.editReply({ embeds: [successEmbed], components: [] });
 
-        // Отправка отчета инструкторам
+        // Отправка отчета в чат инструкторов
         if (INSTRUCTORS_CHAT_ID) {
             const fetchedChannel = await client.channels.fetch(INSTRUCTORS_CHAT_ID).catch(() => null);
             if (fetchedChannel && fetchedChannel.isTextBased() && 'send' in fetchedChannel) {
