@@ -23,6 +23,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "commandkit.config.ts", "commandkit-env.d.ts"],
+  "include": ["src", "commandkit.config.ts", "commandkit-env.d.ts", "zbd-embed.ts"],
   "exclude": ["dist", "src/node_modules", ".commandkit"]
 }

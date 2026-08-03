@@ -1,7 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 import { findAllSyncablePlayers } from '@/database/queries';
-import { syncPlayerProfile } from '@/services/playerSyncService';
-import { sendLog } from '@/utils/logger'; 
+import { syncPlayerProfile } from '@/services/player-sync.service';
+import { sendLog } from '@/utils/logger.utils'; 
 
 export async function runBulkSync(guild: any, interaction: any) {
     const startTime = Date.now();

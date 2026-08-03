@@ -1,6 +1,6 @@
 import { Client } from 'discord.js';
 import { getLastUnprocessedZbd, markZbdProcessed, markAllOldZbdProcessed } from '@/database/queries';
-import { createZbdEmbed } from '@/utils/zbdEmbed';
+import { createZbdEmbed } from '../../zbd-embed';
 
 const ZBD_CHANNEL_ID = process.env.ZBD_CHANNEL_ID as string;
 const CHECK_INTERVAL_MS = 30 * 1000; // Проверка каждые 30 секунд
@@ -14,7 +14,7 @@ export async function startZbdChecker(client: Client, skipOldOnStart: boolean = 
         try {
             // Берем самое последнее ЗБД
             const zbd = await getLastUnprocessedZbd();
-            if (!zbd) return;
+            if (!zbd || !zbd.Date) return;
 
             const channel = await client.channels.fetch(ZBD_CHANNEL_ID).catch(() => null);
 

@@ -1,6 +1,6 @@
 import type { EventHandler } from 'commandkit';
 import { AuditLogEvent } from 'discord.js';
-import { sendAdminLog } from '@/utils/logger';
+import { sendAdminLog } from '@/utils/logger.utils';
 
 const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, guild) => {
     const { action, reason, changes, targetId, executorId, extra } = auditLogEntry;

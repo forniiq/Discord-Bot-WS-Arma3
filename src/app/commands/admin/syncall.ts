@@ -6,7 +6,7 @@ import {
     ButtonStyle, 
     ComponentType 
 } from 'discord.js';
-import { runBulkSync } from '@/services/bulkSyncService';
+import { runBulkSync } from '@/services/bulk-sync.service';
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',

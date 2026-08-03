@@ -2,9 +2,9 @@
 
 import { GuildMember } from 'discord.js';
 import { PlayerInfo } from '@/database/queries';
-import { ROLES_CONFIG } from '@/config/rolesConfig';
-import { parseArmaArray } from '@/utils/arrayParser';
-import { sendLog } from '@/utils/logger';
+import { ROLES_CONFIG } from '@/config/roles-сonfig';
+import { parseArmaArray } from '@/utils/array-parser.utils';
+import { sendLog } from '@/utils/logger.utils';
 
 export async function syncPlayerProfile(
     guild: any, 

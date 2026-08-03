@@ -1,5 +1,5 @@
 import { findPlayer } from '@/database/queries';
-import { buildPlayerDashboard } from '@/utils/dashboard';
+import { buildPlayerDashboard } from '@/utils/dashboard.utils';
 
 export async function openEditPanel(options: {
     interaction: any;

@@ -1,6 +1,6 @@
 import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { ApplicationCommandOptionType, ChannelType, EmbedBuilder } from 'discord.js';
-import { sendLog } from '@/utils/logger';
+import { sendLog } from '@/utils/logger.utils';
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',

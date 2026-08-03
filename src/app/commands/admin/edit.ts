@@ -1,6 +1,6 @@
 import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { ApplicationCommandOptionType } from 'discord.js';
-import { openEditPanel } from '@/services/adminEditService';
+import { openEditPanel } from '@/services/admin-edit.service';
 import { isOperator } from '@/database/queries';
 
 export const metadata: CommandMetadata = {

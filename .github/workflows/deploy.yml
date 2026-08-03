@@ -1,0 +1,35 @@
+name: Deploy War Spectra Bot
+
+on:
+  push:
+    branches: [ "main" ] # Запуск при пуше в ветку main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Build TypeScript Project
+      shell: cmd
+      run: |
+        chcp 65001 > nul
+        :: Явно прописываем пути к портативным Git и Node.js
+        set "PATH=%PATH%;E:\node-portable;E:\Git\cmd"
+
+        echo Installing dependencies...
+        call npm ci
+
+        echo Building TypeScript project...
+        call npm run build
+
+    - name: Restart Bot via PM2
+      shell: cmd
+      run: |
+        :: Прописываем путь к Node.js для запуска PM2
+        set "PATH=%PATH%;E:\node-portable"
+
+        :: Перезапускаем бота или запускаем, если он ещё не был добавлен в PM2
+        call npx pm2 restart ws-arma-bot || call npx pm2 start dist/index.js --name "ws-arma-bot"

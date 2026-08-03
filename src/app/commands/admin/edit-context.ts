@@ -1,6 +1,6 @@
 import type { CommandData, CommandMetadata, UserContextMenuCommand } from 'commandkit';
 import { ApplicationCommandType } from 'discord.js';
-import { openEditPanel } from '@/services/adminEditService';
+import { openEditPanel } from '@/services/admin-edit.service';
 
 export const metadata: CommandMetadata = {
     guilds: [process.env.GUILD_ID as string]

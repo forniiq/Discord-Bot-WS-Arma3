@@ -2,8 +2,8 @@
 
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { PlayerInfo } from '@/database/queries';
-import { RANKS, UNITS, TOGGLE_CATEGORIES } from '@/config/editCategories';
-import { parseArmaArray } from './arrayParser';
+import { RANKS, UNITS, TOGGLE_CATEGORIES } from '@/config/edit-сategories';
+import { parseArmaArray } from './array-parser.utils';
 
 export function buildPlayerDashboard(player: PlayerInfo) {
     const rankName = RANKS[parseInt(player.pLvl, 10)] || `Уровень ${player.pLvl}`;

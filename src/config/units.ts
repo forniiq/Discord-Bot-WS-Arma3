@@ -1,6 +1,6 @@
 // Отряды
 
-import { UNITS } from "./editCategories";
+import { UNITS } from "./edit-сategories";
 
 export function getApprovedUnitsSet(): Set<string> {
     const approved = new Set<string>();

@@ -1,9 +1,8 @@
-import { setupAdminLogging } from '@/services/adminLogger';
-import { startBankAutoSync } from '@/services/bankService';
-import { StartMonitorUpdater } from '@/services/monitorUpdater';
-import { refreshUnitsCache } from '@/services/unitsService';
-import { startZbdChecker } from '@/services/zbdChecker';
-import { initLogger } from '@/utils/logger';
+import { startBankAutoSync } from '@/services/bank.service';
+import { StartMonitorUpdater } from '@/services/monitor-updater.service';
+import { refreshUnitsCache } from '@/services/units.service';
+import { startZbdChecker } from '@/services/zbd-checker.service';
+import { initLogger } from '@/utils/logger.utils';
 import type { EventHandler } from 'commandkit';
 import { Logger } from 'commandkit/logger';
 

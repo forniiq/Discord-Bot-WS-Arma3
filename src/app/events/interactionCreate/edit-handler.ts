@@ -7,11 +7,11 @@ import {
     StringSelectMenuBuilder
 } from 'discord.js';
 import { findPlayer, updatePlayerField } from '@/database/queries';
-import { buildPlayerDashboard } from '@/utils/dashboard';
-import { TOGGLE_CATEGORIES, RANKS, UNITS } from '@/config/editCategories';
-import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/arrayParser';
-import { sendLog } from '@/utils/logger';
-import { syncPlayerProfile } from '@/services/playerSyncService';
+import { buildPlayerDashboard } from '@/utils/dashboard.utils';
+import { TOGGLE_CATEGORIES, RANKS, UNITS } from '@/config/edit-сategories';
+import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
+import { sendLog } from '@/utils/logger.utils';
+import { syncPlayerProfile } from '@/services/player-sync.service';
 
 const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     if (!interaction.guild) return;

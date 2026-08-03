@@ -1,7 +1,7 @@
 // Мониторинг онлайна сервера
 
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
-import { sendLog } from "@/utils/logger";
+import { sendLog } from "@/utils/logger.utils";
 import { getOnlinePlayers, OnlinePlayer, getCurrentZbd, ZBDInfo } from "@/database/queries";
 import { getApprovedUnitsSet } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";

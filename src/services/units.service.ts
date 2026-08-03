@@ -1,5 +1,5 @@
 import { getAllUnits } from '@/database/queries';
-import { UNITS, ROLES_CONFIG } from '@/config/rolesConfig';
+import { UNITS, ROLES_CONFIG } from '@/config/roles-сonfig';
 
 const isTestServer = process.env.IS_TEST_SERVER === "true" || process.env.NODE_ENV === "development";
 
