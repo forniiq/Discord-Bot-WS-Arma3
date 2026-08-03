@@ -166,17 +166,28 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         const requiredRoleId = getRequiredInstructorRoleId(categoryId, itemId);
         const guild = interaction.guild;
 
-        // Безопасное получение списка инструкторов из кэша
-        let instructors = guild.members.cache.filter(m => !m.user.bot);
+        // ГАРАНТИРОВАННОЕ ПОЛУЧЕНИЕ ВСЕХ ИНСТРУКТОРОВ С СЕРВЕРА
+        let instructors;
         if (requiredRoleId) {
-            instructors = instructors.filter(m => m.roles.cache.has(requiredRoleId));
+            // Подтягиваем роль и всех её участников с сервера
+            const role = await guild.roles.fetch(requiredRoleId).catch(() => null);
+            if (role) {
+                // Если у роли есть метод .members, подгружаем их на всякий случай
+                await guild.members.fetch().catch(() => {});
+                instructors = role.members.filter(m => !m.user.bot);
+            } else {
+                instructors = guild.members.cache.filter(m => !m.user.bot);
+            }
+        } else {
+            await guild.members.fetch({ limit: 100 }).catch(() => {});
+            instructors = guild.members.cache.filter(m => !m.user.bot);
         }
 
         if (instructors.size === 0) {
             const errEmbed = new EmbedBuilder()
                 .setTitle('❌ Инструкторы отсутствуют')
                 .setColor('#e74c3c')
-                .setDescription('В данный момент на сервере нет доступных инструкторов с нужной ролью.')
+                .setDescription('В данный момент на сервере нет доступных инструкторов с нужной ролью (или боту не хватает интента Server Members Intent).')
                 .setTimestamp();
 
             const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -203,7 +214,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                     label: inst.displayName.slice(0, 100),
                     value: inst.id,
                     description: `@${inst.user.username}`
-                })).slice(0, 25)
+                })).slice(0, 25) // Дискорд позволяет максимум 25 элементов в селект-меню
             );
 
         const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(instructorMenu);
