@@ -6,7 +6,7 @@ export interface ExpOperationResult {
     rankChanged: boolean;
 }
 
-//Списывает EXP у бойца с каскадным понижением звания при нехватке опыта.
+// Списывает EXP у бойца с понижением звания.
 export function deductExpWithRankDemotion(
     currentRankIndex: number, 
     currentExp: number, 
@@ -16,28 +16,31 @@ export function deductExpWithRankDemotion(
     let exp = currentExp;
     let remainingCost = cost;
 
-    // Пока стоимость больше доступного опыта на текущем звании
-    while (remainingCost > exp) {
-        remainingCost -= exp; // Списываем то, что было на текущем звании
-
-        if (rIndex <= 0) {
-            // Ниже Новобранца/Рядового упасть нельзя
-            rIndex = 0;
-            exp = 0;
+    while (remainingCost > 0) {
+        if (remainingCost <= exp) {
+            exp -= remainingCost;
             remainingCost = 0;
-            break;
+        } else {
+            remainingCost -= exp; // Сжигаем текущий опыт на этом звании
+
+            if (rIndex <= 0) {
+                // Ниже рядового упасть нельзя
+                rIndex = 0;
+                exp = 0;
+                remainingCost = 0;
+                break;
+            }
+
+            // Запоминаем звание, с которого падаем
+            const previousRank = RANKS_DATA[rIndex];
+            
+            // Понижаем ранг
+            rIndex--;
+
+            // Опыт на новом пониженном звании становится равен `exp` ранга, с которого упали
+            exp = previousRank ? previousRank.exp : 0;
         }
-
-        rIndex--; // Падаем на звание ниже
-        const targetRank = RANKS_DATA[rIndex];
-        
-        // Новый опыт становится равен полному порогу этого звания
-        exp = targetRank ? targetRank.exp : 0;
     }
-
-    // Финальное вычитание оставшейся стоимости
-    exp -= remainingCost;
-    if (exp < 0) exp = 0;
 
     return {
         newRankIndex: rIndex,
@@ -46,7 +49,7 @@ export function deductExpWithRankDemotion(
     };
 }
 
-// Добавляет EXP бойцу с каскадным повышением звания при достижении порога.
+// Добавляет EXP инструктору с повышением звания.
 export function addExpWithRankPromotion(
     currentRankIndex: number,
     currentExp: number,
@@ -55,24 +58,23 @@ export function addExpWithRankPromotion(
     let rIndex = currentRankIndex;
     let exp = currentExp + gainedExp;
 
-    // Цикл повышения, пока опыта хватает на следующие звания
+    // Пока можем повышаться и текущего опыта хватает на порог следующего ранга
     while (rIndex + 1 < RANKS_DATA.length) {
-        const nextRank = RANKS_DATA[rIndex + 1];
-        if (!nextRank) break;
-
-        // Если текущего опыта достаточно для перехода на следующее звание
-        if (exp >= nextRank.exp) {
-            exp -= nextRank.exp; // Вычитаем порог нового звания (остаток переносится)
-            rIndex++;            // Повышаем звание
+        const nextRank = RANKS_DATA[rIndex + 1]; // Следующий ранг и его требуемый exp (порог)
+        
+        if (nextRank && exp >= nextRank.exp) {
+            exp -= nextRank.exp; // Вычитаем порог перехода, излишек идет дальше
+            rIndex++;            // Повышаем ранг
         } else {
             break;
         }
     }
 
-    // Защита для максимального звания (если уперлись в потолок)
+    // Защита от выхода за пределы максимального звания в массиве
     if (rIndex >= RANKS_DATA.length - 1) {
-        // Ограничиваем индекс последним элементом
         rIndex = RANKS_DATA.length - 1;
+        // Если это максимальное звание, опыт может копиться бесконечно или упираться в лимит, 
+        // оставляем как есть.
     }
 
     return {
