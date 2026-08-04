@@ -13,12 +13,14 @@ export function formatPlayerProfileEmbed(player: PlayerInfo, discordUserTag: str
     let progressText = 'Максимальное звание достигнуто! 👑';
     if (nextRankObj) {
         const currentExp = player.pExp || 0;
-        const requiredExp = nextRankObj.exp;
-        const prevExp = currentRankObj.exp;
+        // Если в RANKS_DATA хранятся пороги для перехода на следующий ранг:
+        const requiredExp = nextRankObj.exp; 
         
-        const diffTotal = Math.max(1, requiredExp - prevExp);
-        const diffCurrent = Math.max(0, currentExp - prevExp);
-        const percentage = Math.min(Math.max(diffCurrent / diffTotal, 0), 1);
+        // Защита от деления на ноль и некорректных данных
+        const diffTotal = Math.max(1, requiredExp);
+        const diffCurrent = Math.min(Math.max(0, currentExp), diffTotal);
+        
+        const percentage = diffTotal > 0 ? diffCurrent / diffTotal : 0;
         
         const filledBlocks = Math.round(percentage * 10);
         const emptyBlocks = 10 - filledBlocks;

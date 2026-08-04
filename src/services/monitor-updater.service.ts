@@ -289,9 +289,7 @@ function createHeaderEmbed(online: number, zbd: ZBDInfo | null, color: number): 
                 `🕒 Обновлено: <t:${unix}:R>`
             ].join("\n")
         )
-        .setFooter({
-            text: "Спектр Войны • Live Monitor"
-        });
+        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
 }
 
 // Статистика слотов и отрядов

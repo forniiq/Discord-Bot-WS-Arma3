@@ -59,7 +59,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             'Нажмите на кнопку ниже, чтобы начать процедуру оплаты проведенного экзамена.\n\n' +
             '⚠️ **Внимание:** В случае нехватки текущего опыта у вас будет понижено звание!'
         )
-        .setFooter({ text: 'War Spectra Bot • Академия' })
+        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

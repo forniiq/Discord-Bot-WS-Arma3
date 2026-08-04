@@ -59,8 +59,8 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             'Нажмите на кнопку ниже, чтобы открыть ваш засекреченный **военный билет**, проверить текущие звания, допуски, опыт и статус синхронизации ролей в Discord.\n\n' +
             '> *ℹ️ Информация выводится в реальном времени напрямую из боевой базы данных сервера.*'
         )
-        .setColor('#10b981') // Насыщенный тактический зеленый
-        .setFooter({ text: 'War Spectra' })
+        .setColor('#10b981')
+        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

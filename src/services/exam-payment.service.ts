@@ -11,7 +11,7 @@ import {
 } from 'discord.js';
 import { EXAM_DATA, getRequiredInstructorRoleId, ExamItem } from '../config/exams';
 import { RANKS_DATA } from '../config/ranks';
-import { processExamTransaction } from '../database/queries'; // <--- Всё через главный индекс запросов!
+import { processExamTransaction } from '../database/queries';
 import { updateBankDisplay } from './bank.service';
 
 const INSTRUCTORS_CHAT_ID = process.env.INSTRUCTORS_CHAT_ID as string;

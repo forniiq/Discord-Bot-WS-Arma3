@@ -44,7 +44,7 @@ async function generateStudentHeader(userId: string, stepInfo: string) {
                 inline: true 
             }
         )
-        .setFooter({ text: `⚡ Защищенный терминал • ${stepInfo}` })
+        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     return { embed, student };
@@ -282,7 +282,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                 { name: '👤 Инструктор', value: `<@${instructorId}> (+${instructorReward} EXP)`, inline: false },
                 { name: '🏛 Налог в казну банка', value: `+${taxAmount} EXP (${taxPercent}%)`, inline: false }
             )
-            .setFooter({ text: 'War Spectra • Система учета' })
+            .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
             .setTimestamp();
 
         await interaction.editReply({ embeds: [successEmbed], components: [] });

@@ -15,6 +15,7 @@ export interface PlayerInfo {
     pKarma: number;
     pUnits: string;
     DiscID: string | null;
+    pTitle: string;
 }
 
 export interface OnlinePlayer {

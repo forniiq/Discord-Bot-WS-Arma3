@@ -59,3 +59,13 @@ export const TOGGLE_CATEGORIES = {
         options: ["Админ", "Тех.Поддержка", "Заместитель", "Разработчик"]
     }
 };
+
+export const PRESET_COLORS = [
+    { label: '🔴 Ярко-красный', value: '#FF0000', emoji: '🔴' },
+    { label: '🌸 Розовый неон', value: '#FF1493', emoji: '🌸' },
+    { label: '🟡 Золотой', value: '#FFD700', emoji: '🟡' },
+    { label: '🟢 Зеленый', value: '#00FF00', emoji: '🟢' },
+    { label: '🔵 Небесно-голубой', value: '#00BFFF', emoji: '🔵' },
+    { label: '🟣 Пурпурный', value: '#8A2BE2', emoji: '🟣' },
+    { label: '⚪ Белый / Стандартный', value: '#FFFFFF', emoji: '⚪' },
+];

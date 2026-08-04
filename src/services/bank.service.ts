@@ -1,6 +1,6 @@
 import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { getBankBalance } from '../database/queries';
-import { sendLog } from '../utils/logger.utils'; // или console.error
+import { sendLog } from '../utils/logger.utils';
 
 const BANK_CHANNEL_ID = process.env.BANK_CHANNEL_ID as string;
 let BANK_MESSAGE_ID = process.env.BANK_MESSAGE_ID as string | undefined;

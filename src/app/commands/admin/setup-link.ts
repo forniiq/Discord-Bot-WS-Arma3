@@ -65,7 +65,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             'Вы можете узнать его на сайте: [SteamID.pro](https://steamid.pro/ru/) или [SteamID.io](https://steamid.io/)'
         )
         .setColor('#2b2d31')
-        .setFooter({ text: 'War Spectra Bot • Система авторизации' })
+        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

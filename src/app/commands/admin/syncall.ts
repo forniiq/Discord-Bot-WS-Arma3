@@ -35,7 +35,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             '⏳ Этот процесс может занять некоторое время. Вы уверены, что хотите продолжить?'
         )
         .setColor('#f1c40f')
-        .setFooter({ text: `Запрошено: ${interaction.user.tag}` })
+        .setFooter({ text: `Запрошено: ${interaction.user.tag} • Code by DRuiD` })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

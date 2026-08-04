@@ -60,7 +60,7 @@ export const EXAM_DATA: Record<string, ExamCategory> = {
         items: [
             { id: 'faction_zeus', label: 'Зевс', cost: 20000, requiredRoleId: ROLES_CONFIG.kmb[11] },
             { id: 'faction_nato', label: 'НАТО', cost: 15000, requiredRoleId: ROLES_CONFIG.kmb[12] },
-            { id: 'faction_rebel', label: 'Повстанец', cost: 15000 },
+            { id: 'faction_rebel', label: 'Повстанец', cost: 15000, requiredRoleId: ROLES_CONFIG.kmb[14] },
         ],
     },
 };

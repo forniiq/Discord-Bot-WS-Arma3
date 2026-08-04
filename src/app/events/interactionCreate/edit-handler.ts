@@ -4,11 +4,13 @@ import {
     TextInputBuilder, 
     TextInputStyle, 
     ActionRowBuilder, 
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } from 'discord.js';
 import { findPlayer, updatePlayerField } from '@/database/queries';
 import { buildPlayerDashboard } from '@/utils/dashboard.utils';
-import { TOGGLE_CATEGORIES, RANKS, UNITS } from '@/config/edit-сategories';
+import { TOGGLE_CATEGORIES, RANKS, UNITS, PRESET_COLORS } from '@/config/edit-сategories';
 import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
 import { sendLog } from '@/utils/logger.utils';
 import { syncPlayerProfile } from '@/services/player-sync.service';
@@ -129,6 +131,34 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(toggleMenu)]
             });
         }
+
+        // Д) Выбор изменения префикса (pTitle)
+        if (selectedCategory === "edit_title") {
+            const colorMenu = new StringSelectMenuBuilder()
+                .setCustomId(`preset_title_color:${pUID}`)
+                .setPlaceholder("🎨 Выберите готовый цвет префикса...");
+
+            PRESET_COLORS.forEach(preset => {
+                colorMenu.addOptions({
+                    label: preset.label,
+                    value: preset.value,
+                    emoji: preset.emoji
+                });
+            });
+
+            const manualButton = new ButtonBuilder()
+                .setCustomId(`manual_title_prompt:${pUID}`)
+                .setLabel("✍️ Ввести свой HEX вручную")
+                .setStyle(ButtonStyle.Secondary);
+
+            const rowMenu = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(colorMenu);
+            const rowButton = new ActionRowBuilder<ButtonBuilder>().addComponents(manualButton);
+
+            return void await interaction.update({
+                content: "🏷️ **Настройка кастомного префикса (pTitle)**\nВыберите готовый цвет из списка ниже или нажмите кнопку ручного ввода для указания своего HEX-кода:",
+                components: [rowMenu, rowButton]
+            });
+        }
     }
 
     // 2. Сохранение Звания / Отряда
@@ -207,6 +237,110 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         await interaction.deferUpdate();
         const dashboard = buildPlayerDashboard(updatedPlayer);
         return void await interaction.editReply({ content: "✅ Данные обновлены!", ...dashboard });
+    }
+
+    // 5. Обработка выбора цвета из готового пресета (выпадающий список)
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("preset_title_color:")) {
+        const pUID = interaction.customId.split(":")[1];
+        const selectedHex = interaction.values[0]; 
+        if (!pUID) return;
+
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_save_preset_title:${pUID}:${selectedHex}`)
+            .setTitle(`Ввод текста префикса`);
+
+        const textInput = new TextInputBuilder()
+            .setCustomId("titleText")
+            .setLabel("Текст префикса (оставьте пустым для сброса)")
+            .setPlaceholder("Например: Старший Администратор")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(textInput));
+        return void await interaction.showModal(modal);
+    }
+
+    // 6. Обработка нажатия на кнопку "Ввести свой HEX вручную"
+    if (interaction.isButton() && interaction.customId.startsWith("manual_title_prompt:")) {
+        const pUID = interaction.customId.split(":")[1];
+        if (!pUID) return;
+
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_save_custom_title:${pUID}`)
+            .setTitle(`Ручной ввод префикса и цвета`);
+
+        const textInput = new TextInputBuilder()
+            .setCustomId("titleText")
+            .setLabel("Текст префикса")
+            .setPlaceholder("Например: Табакошка")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+
+        const colorInput = new TextInputBuilder()
+            .setCustomId("titleHex")
+            .setLabel("HEX цвет (Пример: #FF1493)")
+            .setValue("#FFFFFF")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(textInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(colorInput)
+        );
+
+        return void await interaction.showModal(modal);
+    }
+
+    // 7. Сохранение префикса (после выбора цвета из пресета)
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_preset_title:")) {
+        const [, pUID, hexColor] = interaction.customId.split(":");
+        const text = interaction.fields.getTextInputValue("titleText").trim();
+        if (!pUID) return;
+
+        // Если текст пустой — очищаем префикс, иначе записываем в формате #FF1493FFТекст
+        const finalTitle = text ? `${hexColor}FF${text}` : "";
+
+        await updatePlayerField(pUID, "pTitle", finalTitle);
+
+        let updatedPlayer = await findPlayer({ steamId: pUID });
+        if (!updatedPlayer) return;
+
+        await syncPlayerProfile(interaction.guild as any, updatedPlayer);
+        updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
+
+        await sendLog('INFO', 'AdminEdit', `Администратор \`${interaction.user.tag}\` установил префикс игроку \`${updatedPlayer.pName}\`: \`${finalTitle}\``);
+
+        await interaction.deferUpdate();
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+        return void await interaction.editReply({ content: "✅ Кастомный префикс успешно обновлен!", ...dashboard });
+    }
+
+    // 8. Сохранение префикса (после ручного ввода HEX)
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_custom_title:")) {
+        const pUID = interaction.customId.split(":")[1];
+        const text = interaction.fields.getTextInputValue("titleText").trim();
+        let hex = interaction.fields.getTextInputValue("titleHex").trim();
+        if (!pUID) return;
+
+        if (!hex.startsWith("#")) {
+            hex = `#${hex}`;
+        }
+
+        const finalTitle = text ? `${hex}FF${text}` : "";
+
+        await updatePlayerField(pUID, "pTitle", finalTitle);
+
+        let updatedPlayer = await findPlayer({ steamId: pUID });
+        if (!updatedPlayer) return;
+
+        await syncPlayerProfile(interaction.guild as any, updatedPlayer);
+        updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
+
+        await sendLog('INFO', 'AdminEdit', `Администратор \`${interaction.user.tag}\` установил ручной префикс игроку \`${updatedPlayer.pName}\`: \`${finalTitle}\``);
+
+        await interaction.deferUpdate();
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+        return void await interaction.editReply({ content: "✅ Кастомный префикс (ручной ввод) успешно обновлен!", ...dashboard });
     }
 };
 
