@@ -2,7 +2,8 @@
 
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger.utils";
-import { getOnlinePlayers, OnlinePlayer, getCurrentZbd, ZBDInfo } from "@/database/queries";
+import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
+import { getCurrentInfo, InfoData } from "@/database/queries/monitoring.queries";
 import { getApprovedUnitsSet } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
 
@@ -37,7 +38,7 @@ export async function StartMonitorUpdater(client: Client) {
     // Если нет сообщения - создание нового
     if (!message) {
         const players = await getOnlinePlayers();
-        const zbd = await getCurrentZbd();
+        const zbd = await getCurrentInfo();
 
         message = await textChannel.send({
             embeds: createEmbeds(players, zbd),
@@ -56,7 +57,7 @@ export async function StartMonitorUpdater(client: Client) {
         try {
             // Получение актуального списка игроков и текущего ЗБД
             const players = await getOnlinePlayers();
-            const zbd = await getCurrentZbd();
+            const zbd = await getCurrentInfo();
 
             // Обновление статуса бота
             const status =
@@ -245,7 +246,7 @@ function formatTime(seconds: number) {
 }
 
 // Сбор всех Embed`ов
-function createEmbeds(players: OnlinePlayer[], zbd: ZBDInfo | null): EmbedBuilder[] {
+function createEmbeds(players: OnlinePlayer[], zbd: InfoData | null): EmbedBuilder[] {
     players.sort(
         (a, b) => b.pLvlSort - a.pLvlSort
     );
@@ -261,7 +262,7 @@ function createEmbeds(players: OnlinePlayer[], zbd: ZBDInfo | null): EmbedBuilde
 }
 
 // Шапка мониторинга (общая информация)
-function createHeaderEmbed(online: number, zbd: ZBDInfo | null, color: number): EmbedBuilder {
+function createHeaderEmbed(online: number, zbd: InfoData | null, color: number): EmbedBuilder {
     const unix = Math.floor(Date.now() / 1000);
 
     const zbdTime = zbd ? formatTime(zbd.Time) : "—";

@@ -51,7 +51,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     }
 
     if (interaction.isButton() && interaction.customId === "btn_refresh_profile") {
-        await interaction.deferUpdate(); // Тихо подтверждаем нажатие кнопки
+        await interaction.deferUpdate();
 
         const player = await findPlayer({ discordId: interaction.user.id });
         if (!player) {

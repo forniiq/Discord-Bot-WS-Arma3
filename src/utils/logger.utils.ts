@@ -1,7 +1,34 @@
 import { Client, EmbedBuilder, ChannelType, ColorResolvable } from 'discord.js';
 import { Logger } from 'commandkit/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string; 
+const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string;
+
+// Путь к файлу логов в корне проекта
+const LOG_FILE_PATH = path.join(process.cwd(), 'bot.log');
+
+// Поклинка текста от Discord-тегов (<@ID>, <#ID>, <@&ID>, backticks) для чистого файла
+function cleanDiscordFormatting(text: string): string {
+    return text
+        .replace(/<@!?(\d+)>/g, 'User($1)')
+        .replace(/<#(\d+)>/g, 'Channel($1)')
+        .replace(/<@&(\d+)>/g, 'Role($1)')
+        .replace(/`{1,3}/g, '')
+        .trim();
+}
+
+// Запись строки в файл bot.log
+function writeToFile(line: string) {
+    const timestamp = new Date().toISOString();
+    const formattedLine = `[${timestamp}] ${line}\n`;
+
+    fs.appendFile(LOG_FILE_PATH, formattedLine, 'utf8', (err) => {
+        if (err) {
+            Logger.error(`[FILE_LOGGER] Ошибка записи в файл: ${err}`);
+        }
+    });
+}
 
 type LogLevel = 'INFO' | 'WARN' | 'ERROR';
 
@@ -27,6 +54,9 @@ export async function sendLog(level: LogLevel, context: string, message: string)
     else if (level === 'WARN') console.warn(consoleText);
     else console.log(consoleText);
 
+    // Логирование в файл
+    writeToFile(`[SYSTEM] [${level}] [${context}] ${cleanDiscordFormatting(message)}`);
+
     if (!discordClient) return;
 
     try {
@@ -49,7 +79,7 @@ export async function sendLog(level: LogLevel, context: string, message: string)
     }
 }
 
-// Логирование действий администрации
+// Логирование действий администрации (Аудит)
 export async function sendAdminLog(options: {
     title: string;
     description: string;
@@ -58,6 +88,17 @@ export async function sendAdminLog(options: {
     executorId?: string;
     targetThumbnail?: string;
 }) {
+    // 1. Формируем текстовое представление для файла
+    const logDetails = options.fields
+        ? options.fields.map(f => `${f.name}: ${f.value}`).join(' | ')
+        : '';
+    
+    const rawFileMessage = `[ADMIN_AUDIT] ${options.title} -> ${options.description}${logDetails ? ` | ${logDetails}` : ''}${options.executorId ? ` (Исполнитель: ${options.executorId})` : ''}`;
+    
+    // Записываем чистый текст в локальный файл
+    writeToFile(cleanDiscordFormatting(rawFileMessage));
+
+    // 2. Отправка в Discord
     if (!discordClient) {
         Logger.error('[ADMIN_LOGGER] Ошибка: discordClient ещё не инициализирован! Вызван ли initLogger(client)?');
         return;
