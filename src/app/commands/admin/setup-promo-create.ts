@@ -14,7 +14,7 @@ export const metadata: CommandMetadata = {
 };
 
 export const command: CommandData = {
-    name: 'setup-profile',
+    name: 'setup-promo-create',
     description: '📢 Отправить панель создания промокода',
     options: [
         {
