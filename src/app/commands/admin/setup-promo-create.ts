@@ -15,7 +15,7 @@ export const metadata: CommandMetadata = {
 
 export const command: CommandData = {
     name: 'setup-promo-create',
-    description: '📢 Отправить панель создания промокода',
+    description: '📢 Отправить панель управления промокодами',
     options: [
         {
             name: 'channel',
@@ -53,10 +53,11 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('🔥 СОЗДАТЬ ПРОМОКОД')
+        .setTitle('🔥 ЦЕНТР УПРАВЛЕНИЯ ПРОМОКОДАМИ')
         .setDescription(
-            'Добро пожаловать в центр управления промокодами.\n\n' +
-            'Нажмите на кнопку ниже, чтобы создать новый промокод.'
+            'Добро пожаловать в панель администратора.\n\n' +
+            '• Нажмите **«Создать промокод»**, чтобы добавить новый код.\n' +
+            '• Нажмите **«Список промокодов»**, чтобы просмотреть активные коды и их статистику.'
         )
         .setColor('#10b981')
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
@@ -67,13 +68,18 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             .setCustomId('btn_create_promo')
             .setLabel('Создать промокод')
             .setEmoji('🗝️')
-            .setStyle(ButtonStyle.Success)
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('btn_list_promo')
+            .setLabel('Список промокодов')
+            .setEmoji('📋')
+            .setStyle(ButtonStyle.Primary)
     );
 
     try {
         await targetChannel.send({ embeds: [embed], components: [row] });
         return void ctx.interaction.reply({ 
-            content: `✅ Панель создания промокода успешно отправлена в канал <#${targetChannel.id}>!`, 
+            content: `✅ Панель управления успешно отправлена в канал <#${targetChannel.id}>!`, 
             ephemeral: true 
         });
     } catch (err) {

@@ -8,25 +8,28 @@ export interface PromocodeData {
     Name: string;
     PromoEXP: number;
     PromoActiv: number;
+    UsedUsers: string | null;
+    ExpiresAt: Date | string | null;
 }
 
 export type PromoRedeemResult = 
     | { success: true; gainedExp: number; newLvl: number; newExp: number; rankChanged: boolean }
-    | { success: false; error: 'NOT_FOUND' | 'INACTIVE' | 'PLAYER_NOT_FOUND' | 'DB_ERROR' };
+    | { success: false; error: 'NOT_FOUND' | 'INACTIVE' | 'EXPIRED' | 'ALREADY_USED' | 'PLAYER_NOT_FOUND' | 'DB_ERROR' };
 
-// 1. Создание промокода (или обновление существующего)
+// 1. Создание или обновление промокода (с опциональной датой истечения)
 export async function createPromocode(
     name: string,
     exp: number,
-    activations: number
+    activations: number,
+    expiresAt: Date | null = null
 ): Promise<boolean> {
     try {
         await sequelize.query(
-            `INSERT INTO promocod (Name, PromoEXP, PromoActiv) 
-                VALUES (:name, :exp, :activations)
-                ON DUPLICATE KEY UPDATE PromoEXP = :exp, PromoActiv = :activations`,
+            `INSERT INTO promocod (Name, PromoEXP, PromoActiv, UsedUsers, ExpiresAt) 
+                VALUES (:name, :exp, :activations, '[]', :expiresAt)
+                ON DUPLICATE KEY UPDATE PromoEXP = :exp, PromoActiv = :activations, ExpiresAt = :expiresAt`,
             {
-                replacements: { name, exp, activations },
+                replacements: { name, exp, activations, expiresAt },
                 type: QueryTypes.INSERT,
             }
         );
@@ -37,34 +40,44 @@ export async function createPromocode(
     }
 }
 
-// 2. Получение информации о промокоде
-export async function getPromocode(name: string, transaction?: Transaction): Promise<PromocodeData | null> {
-    const rows = await sequelize.query<PromocodeData>(
-        'SELECT Name, CAST(PromoEXP AS DOUBLE) as PromoEXP, CAST(PromoActiv AS SIGNED) as PromoActiv FROM promocod WHERE Name = :name LIMIT 1',
-        {
-            replacements: { name },
-            type: QueryTypes.SELECT,
-            transaction
-        }
-    );
-    return rows[0] ?? null;
+// 2. Получение списка всех промокодов (для админов)
+export async function getAllPromocodes(): Promise<PromocodeData[]> {
+    try {
+        const rows = await sequelize.query<PromocodeData>(
+            `SELECT Name, 
+                    CAST(PromoEXP AS DOUBLE) as PromoEXP, 
+                    CAST(PromoActiv AS SIGNED) as PromoActiv, 
+                    UsedUsers, 
+                    ExpiresAt 
+                FROM promocod 
+                ORDER BY Name ASC`,
+            { type: QueryTypes.SELECT }
+        );
+        return rows;
+    } catch (error) {
+        console.error('Ошибка при получении списка промокодов:', error);
+        return [];
+    }
 }
 
-// 3. Атомарное использование промокода
+// 3. Атомарная активация промокода
 export async function redeemPromocode(discId: string, promoName: string): Promise<PromoRedeemResult> {
     const t = await sequelize.transaction();
 
     try {
-        // Проверяем игрока
         const player = await findPlayer({ discordId: discId });
         if (!player) {
             await t.rollback();
             return { success: false, error: 'PLAYER_NOT_FOUND' };
         }
 
-        // Проверяем промокод с блокировкой строки для исключения Race Condition
         const promoRows = await sequelize.query<PromocodeData>(
-            'SELECT Name, CAST(PromoEXP AS DOUBLE) as PromoEXP, CAST(PromoActiv AS SIGNED) as PromoActiv FROM promocod WHERE Name = :name FOR UPDATE',
+            `SELECT Name, 
+                    CAST(PromoEXP AS DOUBLE) as PromoEXP, 
+                    CAST(PromoActiv AS SIGNED) as PromoActiv,
+                    UsedUsers,
+                    ExpiresAt
+                FROM promocod WHERE Name = :name FOR UPDATE`,
             {
                 replacements: { name: promoName },
                 type: QueryTypes.SELECT,
@@ -83,24 +96,48 @@ export async function redeemPromocode(discId: string, promoName: string): Promis
             return { success: false, error: 'INACTIVE' };
         }
 
-        // Получаем текущие уровень и опыт игрока
+        // Проверка даты истечения
+        if (promo.ExpiresAt) {
+            const expDate = new Date(promo.ExpiresAt);
+            if (expDate.getTime() < Date.now()) {
+                await t.rollback();
+                return { success: false, error: 'EXPIRED' };
+            }
+        }
+
+        // Проверка повторного использования
+        let usedUsers: string[] = [];
+        if (promo.UsedUsers) {
+            try {
+                usedUsers = JSON.parse(promo.UsedUsers);
+            } catch {
+                usedUsers = [];
+            }
+        }
+
+        if (usedUsers.includes(discId)) {
+            await t.rollback();
+            return { success: false, error: 'ALREADY_USED' };
+        }
+
         const expData = await getPlayerExpData(discId, t);
         if (!expData) {
             await t.rollback();
             return { success: false, error: 'PLAYER_NOT_FOUND' };
         }
 
-        // Рассчитываем повышение
         const calc = addExpWithRankPromotion(expData.pLvl, expData.pExp, promo.PromoEXP);
-
-        // Обновляем опыт и звание игрока
         await updatePlayerExpAndRankByDiscId(discId, calc.newRankIndex, calc.newExp, t);
 
-        // Уменьшаем количество оставшихся активаций промокода
+        usedUsers.push(discId);
+
         await sequelize.query(
-            'UPDATE promocod SET PromoActiv = PromoActiv - 1 WHERE Name = :name',
+            'UPDATE promocod SET PromoActiv = PromoActiv - 1, UsedUsers = :usedUsers WHERE Name = :name',
             {
-                replacements: { name: promoName },
+                replacements: { 
+                    name: promoName,
+                    usedUsers: JSON.stringify(usedUsers) 
+                },
                 type: QueryTypes.UPDATE,
                 transaction: t
             }

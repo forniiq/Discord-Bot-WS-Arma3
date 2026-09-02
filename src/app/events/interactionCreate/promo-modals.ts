@@ -13,6 +13,7 @@ export default async function (interaction: Interaction) {
         const name = interaction.fields.getTextInputValue('promo_name').trim();
         const exp = parseFloat(interaction.fields.getTextInputValue('promo_exp'));
         const activations = parseInt(interaction.fields.getTextInputValue('promo_activations'), 10);
+        const expiresRaw = interaction.fields.getTextInputValue('promo_expires').trim();
 
         if (isNaN(exp) || isNaN(activations) || exp <= 0 || activations < 0) {
             return void interaction.reply({ 
@@ -21,7 +22,25 @@ export default async function (interaction: Interaction) {
             });
         }
 
-        const success = await createPromocode(name, exp, activations);
+        let expiresAt: Date | null = null;
+        if (expiresRaw.length > 0) {
+            const match = expiresRaw.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+            if (!match) {
+                return void interaction.reply({
+                    content: '❌ **Ошибка:** Неверный формат даты! Используйте формат `ДД.ММ.ГГГГ ЧЧ:ММ` (например: `31.12.2026 23:59`) или оставьте поле пустым.',
+                    ephemeral: true
+                });
+            }
+
+            const [, day, month, year, hours, minutes] = match;
+            expiresAt = new Date(`${year}-${month}-${day}T${hours}:${minutes}:00`);
+
+            if (isNaN(expiresAt.getTime())) {
+                return void interaction.reply({ content: '❌ **Ошибка:** Указана недействительная дата.', ephemeral: true });
+            }
+        }
+
+        const success = await createPromocode(name, exp, activations, expiresAt);
         if (success) {
             const embed = new EmbedBuilder()
                 .setTitle('✅ Промокод успешно создан')
@@ -29,7 +48,12 @@ export default async function (interaction: Interaction) {
                 .addFields(
                     { name: '🗝️ Код', value: `\`${name}\``, inline: true },
                     { name: '⭐ EXP', value: `+${exp}`, inline: true },
-                    { name: '👥 Активаций', value: `${activations}`, inline: true }
+                    { name: '👥 Активаций', value: `${activations}`, inline: true },
+                    { 
+                        name: '⏳ Срок действия', 
+                        value: expiresAt ? `<t:${Math.floor(expiresAt.getTime() / 1000)}:F>` : '♾️ Бессрочно', 
+                        inline: false 
+                    }
                 );
             return void interaction.reply({ embeds: [embed], ephemeral: true });
         } else {
@@ -51,6 +75,10 @@ export default async function (interaction: Interaction) {
                     return void interaction.editReply({ content: '❌ **Ошибка:** Указанный промокод не существует.' });
                 case 'INACTIVE':
                     return void interaction.editReply({ content: '❌ **Ошибка:** Данный промокод больше не активен или лимит его использования исчерпан.' });
+                case 'EXPIRED':
+                    return void interaction.editReply({ content: '❌ **Ошибка:** Срок действия этого промокода истёк!' });
+                case 'ALREADY_USED':
+                    return void interaction.editReply({ content: '❌ **Ошибка:** Вы уже активировали этот промокод ранее!' });
                 case 'PLAYER_NOT_FOUND':
                     return void interaction.editReply({ content: '❌ **Ошибка:** Ваш профиль не найден в базе данных игроков.' });
                 default:

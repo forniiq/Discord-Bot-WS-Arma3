@@ -1,5 +1,3 @@
-// Сервис синхронизации профиля
-
 import { GuildMember } from 'discord.js';
 import { PlayerInfo } from '@/database/queries';
 import { ROLES_CONFIG } from '@/config/roles-сonfig';
@@ -18,19 +16,15 @@ export async function syncPlayerProfile(
         return { roleSuccess: false, nameSuccess: false };
     }
 
-    let member: GuildMember | null = cachedMember 
+    // Достаем участника из переданного параметра или из кэша гильдии
+    const member: GuildMember | null = cachedMember 
         ?? guild.members.cache.get(player.DiscID) 
         ?? null;
 
+    // Если участника нет в кэше — прекращаем обработку без сетевого запроса fetch()
     if (!member) {
-        try {
-            member = await guild.members.fetch(player.DiscID);
-        } catch {
-            return { roleSuccess: false, nameSuccess: false };
-        }
+        return { roleSuccess: false, nameSuccess: false };
     }
-
-    if (!member) return { roleSuccess: false, nameSuccess: false };
 
     // 1. Сбор целевых ролей
     const targetRoleIds = new Set<string>();
@@ -50,7 +44,6 @@ export async function syncPlayerProfile(
         const rankRoleId = ROLES_CONFIG.ranks[rankIndex];
         if (rankRoleId) targetRoleIds.add(rankRoleId);
 
-        // Проверка состава званий (Рядовой, Сержантский и т.д.)
         for (const cat of Object.values(ROLES_CONFIG.rankCategories)) {
             if (cat.rankIndexes.includes(rankIndex) && cat.categoryRoleId) {
                 targetRoleIds.add(cat.categoryRoleId);
@@ -126,7 +119,7 @@ export async function syncPlayerProfile(
         targetRoleIds.add(ROLES_CONFIG.categoryCoursesRoleId);
     }
 
-    // 2. Обновление ролей
+    // 2. Оптимизированное обновление ролей
     try {
         const allManagedRoles = new Set<string>();
         Object.values(ROLES_CONFIG.units).forEach(u => u.roleId && allManagedRoles.add(u.roleId));
@@ -143,31 +136,47 @@ export async function syncPlayerProfile(
         ROLES_CONFIG.courses.forEach(r => r && allManagedRoles.add(r));
         if (ROLES_CONFIG.categoryCoursesRoleId) allManagedRoles.add(ROLES_CONFIG.categoryCoursesRoleId);
 
-        const userOtherRoleIds = member.roles.cache
-            .map(r => r.id)
-            .filter(id => !allManagedRoles.has(id));
+        // Роли пользователя, которые не находятся под управлением системы синхронизации
+        const currentRoleIds = member.roles.cache.map(r => r.id);
+        const userOtherRoleIds = currentRoleIds.filter(id => !allManagedRoles.has(id));
 
-        const finalRoleIds = Array.from(new Set([...userOtherRoleIds, ...Array.from(targetRoleIds)]));
+        const finalRoleSet = new Set([...userOtherRoleIds, ...Array.from(targetRoleIds)]);
+        
+        // Сравнение состава текущих ролей с целевым набором
+        const hasRoleChanges = currentRoleIds.length !== finalRoleSet.size || 
+            currentRoleIds.some(id => !finalRoleSet.has(id));
 
-        await member.roles.set(finalRoleIds);
+        if (hasRoleChanges) {
+            await member.roles.set(Array.from(finalRoleSet));
+        }
+        
         roleSuccess = true;
     } catch (err) {
         await sendLog('ERROR', 'SyncService', `Ошибка при обновлении ролей ${player.pName} (${member.id}): ${err}`);
     }
 
-    // 3. Обновление никнейма в Discord
+    // 3. Оптимизированное обновление никнейма в Discord
     try {
-        // Очистка существующих скобок в никнейме (Отряда)
+        // Очистка от существующих скобок в никнейме
         const cleanName = player.pName.replace(/^\[.*?\]\s*/, '').trim();
-        
+
         let targetNickname = cleanName;
         if (unitConfig && unitConfig.tag) {
-            targetNickname = `[${unitConfig.tag}] ${cleanName}`;
+            // Удаляем случайные скобки по краям тега перед сборкой
+            const rawTag = unitConfig.tag.replace(/^\[+|\]+$/g, '').trim();
+            targetNickname = `[${rawTag}] ${cleanName}`;
         }
 
-        // Обновление никнейма
+        // Ограничение Discord на длину никнейма (максимум 32 символа)
+        if (targetNickname.length > 32) {
+            targetNickname = targetNickname.substring(0, 32);
+        }
+
         if (member.manageable) {
-            if (member.nickname !== targetNickname) {
+            const currentName = member.nickname ?? member.user.username;
+            
+            // Выполняем API-запрос только при расхождении никнеймов
+            if (currentName !== targetNickname) {
                 await member.setNickname(targetNickname);
             }
             nameSuccess = true;
