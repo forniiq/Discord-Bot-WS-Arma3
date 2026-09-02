@@ -1,0 +1,126 @@
+import { EventHandler } from 'commandkit';
+import { 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle,
+    PermissionsBitField
+} from 'discord.js';
+import { exec } from 'child_process';
+import { sendLog, sendAdminLog } from '@/utils/logger.utils';
+
+// Пути к батникам рестарта
+const BATCH_PATHS = {
+    pve: 'C:\\arma3server\\RESTAR WAS_Altis.bat',
+    pvp: 'D:\\arma3serverPVP\\RESTAR WAS_Altis.bat'
+};
+
+const handler: EventHandler<"interactionCreate"> = async (interaction) => {
+    if (!interaction.guild || !interaction.isButton()) return;
+
+    // 1. Первичное нажатие на кнопки "Рестарт PvE" или "Рестарт PvP"
+    if (interaction.customId === 'btn_restart_pve' || interaction.customId === 'btn_restart_pvp') {
+        const isPvE = interaction.customId === 'btn_restart_pve';
+        const serverType = isPvE ? 'PvE' : 'PvP';
+
+        const confirmEmbed = new EmbedBuilder()
+            .setTitle('⚠️ ПОДТВЕРЖДЕНИЕ РЕСТАРТА')
+            .setDescription(
+                `Вы действительно хотите запустить **перезапуск ${serverType} сервера**?\n\n` +
+                'Все текущие игроки будут отключены!'
+            )
+            .setColor('#fee75c');
+
+        const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`confirm_restart_${isPvE ? 'pve' : 'pvp'}`)
+                .setLabel(`Подтвердить рестарт ${serverType}`)
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('⚠️'),
+            new ButtonBuilder()
+                .setCustomId('cancel_restart')
+                .setLabel('Отмена')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('❌')
+        );
+
+        return void interaction.reply({
+            embeds: [confirmEmbed],
+            components: [confirmRow],
+            ephemeral: true
+        });
+    }
+
+    // 2. Нажатие кнопки "Отмена"
+    if (interaction.customId === 'cancel_restart') {
+        return void interaction.update({
+            content: '❌ **Перезапуск сервера отменен.**',
+            embeds: [],
+            components: []
+        });
+    }
+
+    // 3. Подтверждение перезапуска (confirm_restart_pve / confirm_restart_pvp)
+    if (interaction.customId === 'confirm_restart_pve' || interaction.customId === 'confirm_restart_pvp') {
+        if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+            return void interaction.reply({
+                content: '❌ **Недостаточно прав:** Данное действие могут выполнять только администраторы.',
+                ephemeral: true
+            });
+        }
+
+        const type = interaction.customId === 'confirm_restart_pve' ? 'pve' : 'pvp';
+        const isPvE = type === 'pve';
+        const serverName = isPvE ? 'PvE' : 'PvP';
+        const batPath = BATCH_PATHS[type];
+
+        // Ответ администратору, нажавшему кнопку
+        await interaction.update({
+            content: `⏳ **Запускается процесс рестарта ${serverName} сервера...**`,
+            embeds: [],
+            components: []
+        });
+
+        // Вызов .bat файла
+        exec(`"${batPath}"`, async (error) => {
+            if (error) {
+                await sendLog('ERROR', 'Arma3Restart', `Ошибка выполнения батника ${serverName}: ${error.message}`);
+                return;
+            }
+            await sendLog('INFO', 'Arma3Restart', `Успешно запущен батник рестарта ${serverName} сервера.`);
+        });
+
+        // Красивое объявление для игроков в текстовый канал
+        const publicEmbed = new EmbedBuilder()
+            .setTitle(isPvE ? '🛡️ РЕСТАРТ PVE СЕРВЕРА' : '⚔️ РЕСТАРТ PVP СЕРВЕРА')
+            .setDescription(
+                `Производится рестарт **${serverName}** сервера!\n\n` +
+                '🔄 Сервер перезапускается и будет доступен через **3–5 минут**.\n' +
+                'Пожалуйста, подождите и переподключитесь после завершения.'
+            )
+            .setColor(isPvE ? '#2ecc71' : '#e74c3c')
+            .setFooter({ text: 'War Spectra • Управление серверами' })
+            .setTimestamp();
+
+        if (interaction.channel && 'send' in interaction.channel) {
+            await interaction.channel.send({
+                content: '@here',
+                embeds: [publicEmbed]
+            });
+        }
+
+        // Запись в лог аудита администраторов
+        await sendAdminLog({
+            title: '🔄 Рестарт сервера Arma 3',
+            description: `Администратор <@${interaction.user.id}> запустил рестарт **${serverName}** сервера.`,
+            color: isPvE ? '#57f287' : '#ed4245',
+            executorId: interaction.user.id,
+            fields: [
+                { name: 'Сервер', value: `${serverName} Altis`, inline: true },
+                { name: 'Файл', value: `\`${batPath}\``, inline: true }
+            ]
+        });
+    }
+};
+
+export default handler;
