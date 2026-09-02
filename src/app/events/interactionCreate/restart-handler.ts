@@ -26,8 +26,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const confirmEmbed = new EmbedBuilder()
             .setTitle('⚠️ ПОДТВЕРЖДЕНИЕ РЕСТАРТА')
             .setDescription(
-                `Вы действительно хотите запустить **перезапуск ${serverType} сервера**?\n\n` +
-                'Все текущие игроки будут отключены!'
+                `Вы действительно хотите запустить **перезапуск ${serverType} сервера**?`
             )
             .setColor('#fee75c');
 
@@ -95,11 +94,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             .setTitle(isPvE ? '🛡️ РЕСТАРТ PVE СЕРВЕРА' : '⚔️ РЕСТАРТ PVP СЕРВЕРА')
             .setDescription(
                 `Производится рестарт **${serverName}** сервера!\n\n` +
-                '🔄 Сервер перезапускается и будет доступен через **3–5 минут**.\n' +
+                '🔄 Сервер перезапускается и будет доступен через пару минут.\n' +
                 'Пожалуйста, подождите и переподключитесь после завершения.'
             )
             .setColor(isPvE ? '#2ecc71' : '#e74c3c')
-            .setFooter({ text: 'War Spectra • Управление серверами' })
+            .setFooter({ text: 'War Spectra' })
             .setTimestamp();
 
         if (interaction.channel && 'send' in interaction.channel) {
@@ -111,7 +110,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
         // Запись в лог аудита администраторов
         await sendAdminLog({
-            title: '🔄 Рестарт сервера Arma 3',
+            title: '🔄 Рестарт сервера',
             description: `Администратор <@${interaction.user.id}> запустил рестарт **${serverName}** сервера.`,
             color: isPvE ? '#57f287' : '#ed4245',
             executorId: interaction.user.id,

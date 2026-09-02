@@ -16,7 +16,7 @@ export const metadata: CommandMetadata = {
 
 export const command: CommandData = {
     name: 'setup-restart',
-    description: '⚙️ Отправить панель управления рестартом серверов Arma 3',
+    description: '⚙️ Отправить панель управления рестартами серверов',
     options: [
         {
             name: 'channel',
@@ -54,12 +54,9 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('⚡ ПАНЕЛЬ УПРАВЛЕНИЯ СЕРВЕРАМИ ARMA 3')
+        .setTitle('⚡ ПАНЕЛЬ УПРАВЛЕНИЯ РЕСТАРТАМИ СЕРВЕРА')
         .setDescription(
-            'Нажмите на соответствующую кнопку ниже, чтобы запустить процедуру рестарта нужного сервера.\n\n' +
-            '🟢 **PvE Server** — Altis Life / Co-op\n' +
-            '🔴 **PvP Server** — Altis Warfare / TvT\n\n' +
-            '⚠️ *Каждое действие требует подтверждения в интерактивном окне.*'
+            'Нажмите на соответствующую кнопку ниже, чтобы перезапустить нужный сервер.'
         )
         .setColor('#2b2d31')
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
