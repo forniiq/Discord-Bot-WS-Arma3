@@ -59,7 +59,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             'Нажмите на соответствующую кнопку ниже, чтобы перезапустить нужный сервер.'
         )
         .setColor('#2b2d31')
-        .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
+        .setFooter({ text: 'War Spectra Bot' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

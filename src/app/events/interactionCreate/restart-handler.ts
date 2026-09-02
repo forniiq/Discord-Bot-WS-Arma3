@@ -80,44 +80,60 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             components: []
         });
 
-        // Вызов .bat файла
+        // Запуск .bat файла
         exec(`"${batPath}"`, async (error) => {
             if (error) {
                 await sendLog('ERROR', 'Arma3Restart', `Ошибка выполнения батника ${serverName}: ${error.message}`);
-                return;
+                
+                return void interaction.followUp({
+                    content: `❌ **Ошибка при запуске батника ${serverName}:** \`${error.message}\``,
+                    ephemeral: true
+                }).catch(() => null);
             }
+
             await sendLog('INFO', 'Arma3Restart', `Успешно запущен батник рестарта ${serverName} сервера.`);
-        });
 
-        // Красивое объявление для игроков в текстовый канал
-        const publicEmbed = new EmbedBuilder()
-            .setTitle(isPvE ? '🛡️ РЕСТАРТ PVE СЕРВЕРА' : '⚔️ РЕСТАРТ PVP СЕРВЕРА')
-            .setDescription(
-                `Производится рестарт **${serverName}** сервера!\n\n` +
-                '🔄 Сервер перезапускается и будет доступен через пару минут.\n' +
-                'Пожалуйста, подождите и переподключитесь после завершения.'
-            )
-            .setColor(isPvE ? '#2ecc71' : '#e74c3c')
-            .setFooter({ text: 'War Spectra' })
-            .setTimestamp();
+            // Отправка анонса игрокам при успешном запуске скрипта
+            const ANNOUNCE_CHANNEL_ID = process.env.RESTART_ANNOUNCE_CHANNEL_ID;
 
-        if (interaction.channel && 'send' in interaction.channel) {
-            await interaction.channel.send({
-                content: '@here',
-                embeds: [publicEmbed]
+            if (ANNOUNCE_CHANNEL_ID) {
+                try {
+                    const announceChannel = interaction.guild?.channels.cache.get(ANNOUNCE_CHANNEL_ID) 
+                        || await interaction.guild?.channels.fetch(ANNOUNCE_CHANNEL_ID);
+
+                    if (announceChannel && announceChannel.isTextBased() && 'send' in announceChannel) {
+                        const publicEmbed = new EmbedBuilder()
+                            .setTitle(isPvE ? '🛡️ РЕСТАРТ PVE СЕРВЕРА' : '⚔️ РЕСТАРТ PVP СЕРВЕРА')
+                            .setDescription(
+                                `Производится рестарт **${serverName}** сервера!\n\n` +
+                                '🔄 Сервер перезапускается и будет доступен через пару минут.\n' +
+                                'Пожалуйста, подождите и переподключитесь после завершения.'
+                            )
+                            .setColor(isPvE ? '#2ecc71' : '#e74c3c')
+                            .setFooter({ text: 'War Spectra' })
+                            .setTimestamp();
+
+                        await announceChannel.send({
+                            content: '@here',
+                            embeds: [publicEmbed]
+                        });
+                    }
+                } catch (err) {
+                    await sendLog('ERROR', 'ArmaRestart', `Не удалось отправить анонс в канал ${ANNOUNCE_CHANNEL_ID}: ${err}`);
+                }
+            }
+
+            // Запись в лог аудита администраторов
+            await sendAdminLog({
+                title: '🔄 Рестарт сервера',
+                description: `Администратор <@${interaction.user.id}> запустил рестарт **${serverName}** сервера.`,
+                color: isPvE ? '#57f287' : '#ed4245',
+                executorId: interaction.user.id,
+                fields: [
+                    { name: 'Сервер', value: `${serverName} Altis`, inline: true },
+                    { name: 'Файл', value: `\`${batPath}\``, inline: true }
+                ]
             });
-        }
-
-        // Запись в лог аудита администраторов
-        await sendAdminLog({
-            title: '🔄 Рестарт сервера',
-            description: `Администратор <@${interaction.user.id}> запустил рестарт **${serverName}** сервера.`,
-            color: isPvE ? '#57f287' : '#ed4245',
-            executorId: interaction.user.id,
-            fields: [
-                { name: 'Сервер', value: `${serverName} Altis`, inline: true },
-                { name: 'Файл', value: `\`${batPath}\``, inline: true }
-            ]
         });
     }
 };
