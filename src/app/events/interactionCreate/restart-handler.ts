@@ -6,8 +6,9 @@ import {
     ButtonStyle,
     PermissionsBitField
 } from 'discord.js';
-import { exec } from 'child_process';
 import { sendLog, sendAdminLog } from '@/utils/logger.utils';
+import { spawn } from 'child_process';
+import path from 'path';
 
 // Пути к батникам рестарта
 const BATCH_PATHS = {
@@ -80,18 +81,46 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             components: []
         });
 
-        // Запуск .bat файла
-        exec(`"${batPath}"`, async (error) => {
-            if (error) {
-                await sendLog('ERROR', 'Arma3Restart', `Ошибка выполнения батника ${serverName}: ${error.message}`);
-                
-                return void interaction.followUp({
-                    content: `❌ **Ошибка при запуске батника ${serverName}:** \`${error.message}\``,
-                    ephemeral: true
-                }).catch(() => null);
-            }
+        // Запуск .bat файла через cmd.exe
+        const batDir = path.dirname(batPath);
+        const batFile = path.basename(batPath);
 
-            await sendLog('INFO', 'Arma3Restart', `Успешно запущен батник рестарта ${serverName} сервера.`);
+        const restartProcess = spawn(
+            'cmd.exe',
+            ['/c', batFile],
+            {
+                cwd: batDir,
+                windowsHide: false
+            }
+        );
+
+        restartProcess.stdout?.on('data', (data) => {
+            console.log(`[${serverName}] ${data}`);
+        });
+
+        restartProcess.stderr?.on('data', (data) => {
+            console.error(`[${serverName}] ${data}`);
+        });
+
+        restartProcess.on('error', async (error) => {
+            await sendLog(
+                'ERROR',
+                'Arma3Restart',
+                `Ошибка запуска батника ${serverName}: ${error.message}`
+            );
+
+            await interaction.followUp({
+                content: `❌ **Не удалось запустить рестарт ${serverName}:**\n\`${error.message}\``,
+                ephemeral: true
+            }).catch(() => null);
+        });
+
+        restartProcess.on('spawn', async () => {
+            await sendLog(
+                'INFO',
+                'Arma3Restart',
+                `Батник рестарта ${serverName} успешно запущен.`
+            );
 
             // Отправка анонса игрокам при успешном запуске скрипта
             const ANNOUNCE_CHANNEL_ID = process.env.RESTART_ANNOUNCE_CHANNEL_ID;
@@ -134,6 +163,10 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                     { name: 'Файл', value: `\`${batPath}\``, inline: true }
                 ]
             });
+        });
+
+        restartProcess.on('close', (code) => {
+            console.log(`[${serverName}] Батник завершился с кодом: ${code}`);
         });
     }
 };
