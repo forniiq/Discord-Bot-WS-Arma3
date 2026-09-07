@@ -11,6 +11,7 @@ import {
     ButtonStyle
 } from 'discord.js';
 import { getAllPromocodes, getPromocode, deletePromocode } from '../../../database/queries/promo.queries';
+import { requireOperator } from '@/utils/operator.utils';
 
 export default async function (interaction: Interaction) {
     // 1. ОБРАБОТКА ВЫПАДАЮЩЕГО СПИСКА
@@ -152,8 +153,11 @@ export default async function (interaction: Interaction) {
 
     // 4. КНОПКА «РЕДАКТИРОВАТЬ»
     if (interaction.customId.startsWith('btn_edit_promo:')) {
-        if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
-            return void interaction.reply({ content: '❌ У вас нет прав на изменение промокодов.', ephemeral: true });
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
         }
 
         // Разделяем id безопасным образом, гарантируя получение строки

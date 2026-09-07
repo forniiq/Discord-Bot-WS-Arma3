@@ -14,9 +14,23 @@ import { TOGGLE_CATEGORIES, RANKS, UNITS, PRESET_COLORS } from '@/config/edit-с
 import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
 import { sendLog } from '@/utils/logger.utils';
 import { syncPlayerProfile } from '@/services/player-sync.service';
+import { requireOperator } from '@/utils/operator.utils';
 
 const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     if (!interaction.guild) return;
+
+    if (
+        !interaction.isStringSelectMenu() &&
+        !interaction.isButton() &&
+        !interaction.isModalSubmit()
+    ) return;
+
+    if (!(await requireOperator(interaction.user.id))) {
+        return void interaction.reply({
+            content: '❌ У вас нет доступа к этому действию.',
+            ephemeral: true
+        });
+    }
 
     // 1. Выбор категории из главного меню
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("edit_select_category:")) {

@@ -3,12 +3,13 @@ import {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle,
-    PermissionsBitField
+    ButtonStyle
 } from 'discord.js';
 import { sendLog, sendAdminLog } from '@/utils/logger.utils';
 import { spawn } from 'child_process';
 import path from 'path';
+import { requireOperator } from '@/utils/operator.utils';
+import { getRandomRestartMessage } from '@/config/restart-messages';
 
 // Пути к батникам рестарта
 const BATCH_PATHS = {
@@ -21,6 +22,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 1. Первичное нажатие на кнопки "Рестарт PvE" или "Рестарт PvP"
     if (interaction.customId === 'btn_restart_pve' || interaction.customId === 'btn_restart_pvp') {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const isPvE = interaction.customId === 'btn_restart_pve';
         const serverType = isPvE ? 'PvE' : 'PvP';
 
@@ -62,9 +70,9 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 3. Подтверждение перезапуска (confirm_restart_pve / confirm_restart_pvp)
     if (interaction.customId === 'confirm_restart_pve' || interaction.customId === 'confirm_restart_pvp') {
-        if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+        if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
-                content: '❌ **Недостаточно прав:** Данное действие могут выполнять только администраторы.',
+                content: '❌ У вас нет доступа к этому действию.',
                 ephemeral: true
             });
         }
@@ -116,12 +124,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
 
         restartProcess.on('spawn', async () => {
-            await sendLog(
-                'INFO',
-                'Arma3Restart',
-                `Батник рестарта ${serverName} успешно запущен.`
-            );
-
             // Отправка анонса игрокам при успешном запуске скрипта
             const ANNOUNCE_CHANNEL_ID = process.env.RESTART_ANNOUNCE_CHANNEL_ID;
 
@@ -131,13 +133,14 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                         || await interaction.guild?.channels.fetch(ANNOUNCE_CHANNEL_ID);
 
                     if (announceChannel && announceChannel.isTextBased() && 'send' in announceChannel) {
+                        const restartMessage = getRandomRestartMessage(
+                            serverName,
+                            `<@${interaction.user.id}>`
+                        );
+
                         const publicEmbed = new EmbedBuilder()
-                            .setTitle(isPvE ? '🛡️ РЕСТАРТ PVE СЕРВЕРА' : '⚔️ РЕСТАРТ PVP СЕРВЕРА')
-                            .setDescription(
-                                `Производится рестарт **${serverName}** сервера!\n\n` +
-                                '🔄 Сервер перезапускается и будет доступен через пару минут.\n' +
-                                'Пожалуйста, подождите и переподключитесь после завершения.'
-                            )
+                            .setTitle(restartMessage.title)
+                            .setDescription(restartMessage.description)
                             .setColor(isPvE ? '#2ecc71' : '#e74c3c')
                             .setFooter({ text: 'War Spectra' })
                             .setTimestamp();
