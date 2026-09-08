@@ -55,12 +55,6 @@ export async function StartMonitorUpdater(client: Client) {
             "Monitor",
             `Создан новый мониторинг онлайна: ${message.id}`
         );
-    } else {
-        sendLog(
-            "INFO",
-            "Monitor",
-            `Восстановлено существующее сообщение мониторинга: ${message.id}`
-        );
     }
 
     let isUpdating = false;
