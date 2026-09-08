@@ -80,21 +80,30 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
     // 1. Открытие главного меню оплаты из канала (Reply)
     if (interaction.isButton() && interaction.customId === 'btn_start_exam_pay') {
-        const { embed, student } = await generateStudentHeader(interaction.user.id, 'Шаг 1 из 3 • Выберите категорию');
+        await interaction.deferReply({
+            flags: MessageFlags.Ephemeral
+        });
+
+        const { embed, student } = await generateStudentHeader(
+            interaction.user.id,
+            'Шаг 1 из 3 • Выберите категорию'
+        );
 
         if (!student) {
-            return void await interaction.reply({ 
-                content: '❌ Ваш профиль не найден в базе данных! Требуется регистрация.', 
-                flags: MessageFlags.Ephemeral 
+            return void await interaction.editReply({
+                content: '❌ Ваш профиль не найден в базе данных! Требуется регистрация.',
+                embeds: [],
+                components: []
             });
         }
 
-        embed.setDescription('Выберите категорию интересующего вас направления с помощью интерактивных кнопок ниже:');
+        embed.setDescription(
+            'Выберите категорию интересующего вас направления с помощью интерактивных кнопок ниже:'
+        );
 
-        return void await interaction.reply({ 
-            embeds: [embed], 
-            components: getCategoryButtons() as any, 
-            flags: MessageFlags.Ephemeral 
+        return void await interaction.editReply({
+            embeds: [embed],
+            components: getCategoryButtons() as any
         });
     }
 

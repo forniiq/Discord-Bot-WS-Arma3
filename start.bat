@@ -5,10 +5,10 @@ setlocal
 title WarSpectra Discord Bot
 
 set "PROJECT_DIR=E:\Discord-Bot-WS-Arma"
-set "GIT_DIR=E:\Git"
-set "NODE_DIR=E:\node-portable"
+set "GIT_PATH=E:\Git"
+set "NODE_PATH=E:\node-portable"
 
-set "PATH=%GIT_DIR%\cmd;%GIT_DIR%\bin;%NODE_DIR%;%PATH%"
+set "PATH=%GIT_PATH%\cmd;%GIT_PATH%\bin;%NODE_PATH%;%PATH%"
 
 cd /d "%PROJECT_DIR%"
 
@@ -30,15 +30,30 @@ echo [INFO] npm:
 call npm --version
 
 echo.
+echo ==========================================
+echo          АВТОПЕРЕЗАПУСК ВКЛЮЧЕН
+echo          Задержка: 5 секунд
+echo ==========================================
+echo.
+
+:START
+
+echo.
+echo ==========================================
 echo [INFO] Запуск бота...
-echo.
-
-call "%NODE_DIR%\npm.cmd" run start
-
-echo.
-echo ==========================================
-echo          БОТ ОСТАНОВЛЕН
 echo ==========================================
 echo.
 
-pause
+call "%NODE_PATH%\npm.cmd" run start
+
+echo.
+echo ==========================================
+echo [WARNING] Бот остановился!
+echo ==========================================
+echo.
+echo Перезапуск через 5 секунд...
+echo.
+
+timeout /t 5 /nobreak >nul
+
+goto START
