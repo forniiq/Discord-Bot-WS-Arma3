@@ -13,7 +13,7 @@ const handler: EventHandler<'clientReady'> = async (client: any) => {
   initLogger(client);
   StartMonitorUpdater(client);
   startZbdChecker(client, false);
-  startBankAutoSync(client, 60_000);
+  startBankAutoSync(client);
   await refreshUnitsCache();
 };
 
