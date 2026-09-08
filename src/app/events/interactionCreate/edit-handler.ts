@@ -25,15 +25,16 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         !interaction.isModalSubmit()
     ) return;
 
-    if (!(await requireOperator(interaction.user.id))) {
-        return void interaction.reply({
-            content: '❌ У вас нет доступа к этому действию.',
-            ephemeral: true
-        });
-    }
-
     // 1. Выбор категории из главного меню
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("edit_select_category:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+
         const pUID = interaction.customId.split(":")[1];
         if (!pUID) return;
 
@@ -177,6 +178,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 2. Сохранение Звания / Отряда
     if (interaction.isStringSelectMenu() && (interaction.customId.startsWith("save_rank:") || interaction.customId.startsWith("save_unit:"))) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const parts = interaction.customId.split(":");
         const action = parts[0];
         const pUID = parts[1];
@@ -203,6 +211,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 3. Сохранение Флажков / Допусков
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("save_toggles:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const parts = interaction.customId.split(":");
         const pUID = parts[1];
         const dbColumn = parts[2];
@@ -229,6 +244,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 4. Сохранение Модального Окна (Ручная смена никнейма, опыта, кармы)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_main:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const pUID = interaction.customId.split(":")[1];
         if (!pUID) return;
 
@@ -255,6 +277,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 5. Обработка выбора цвета из готового пресета (выпадающий список)
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("preset_title_color:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const pUID = interaction.customId.split(":")[1];
         const selectedHex = interaction.values[0]; 
         if (!pUID) return;
@@ -276,6 +305,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 6. Обработка нажатия на кнопку "Ввести свой HEX вручную"
     if (interaction.isButton() && interaction.customId.startsWith("manual_title_prompt:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const pUID = interaction.customId.split(":")[1];
         if (!pUID) return;
 
@@ -307,6 +343,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 7. Сохранение префикса (после выбора цвета из пресета)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_preset_title:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const [, pUID, hexColor] = interaction.customId.split(":");
         const text = interaction.fields.getTextInputValue("titleText").trim();
         if (!pUID) return;
@@ -331,6 +374,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
     // 8. Сохранение префикса (после ручного ввода HEX)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_custom_title:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
         const pUID = interaction.customId.split(":")[1];
         const text = interaction.fields.getTextInputValue("titleText").trim();
         let hex = interaction.fields.getTextInputValue("titleHex").trim();
