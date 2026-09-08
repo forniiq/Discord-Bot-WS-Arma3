@@ -13,9 +13,10 @@ import { EXAM_DATA, getRequiredInstructorRoleId, ExamItem } from '../config/exam
 import { RANKS_DATA } from '../config/ranks';
 import { processExamTransaction } from '../database/queries';
 import { updateBankDisplay } from './bank.service';
+import { SERVER_CONFIG } from '@/config/server.config';
 
-const INSTRUCTORS_CHAT_ID = process.env.INSTRUCTORS_CHAT_ID as string;
-const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string;
+const INSTRUCTORS_CHAT_ID = SERVER_CONFIG.discord.channels.instructorsChat as string;
+const LOGS_CHANNEL_ID = SERVER_CONFIG.discord.channels.logs as string;
 
 export function createPaymentEmbed() {
     const embed = new EmbedBuilder()

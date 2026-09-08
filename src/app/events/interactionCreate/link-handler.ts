@@ -8,9 +8,10 @@ import {
 import { findPlayer, updatePlayerField } from '@/database/queries';
 import { syncPlayerProfile } from '@/services/player-sync.service';
 import { sendLog } from '@/utils/logger.utils';
+import { SERVER_CONFIG } from '@/config/server.config';
 
 // ID роли "Привязан"
-const LINKED_ROLE_ID = process.env.LINKED_ROLE_ID;
+const LINKED_ROLE_ID = SERVER_CONFIG.discord.roles.linked;
 
 // Вспомогательная функция для проверки валидности привязанного DiscID
 function isDiscIdLinked(discId: string | number | null | undefined): boolean {
@@ -79,7 +80,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         // Выдача роли "Привязан"
         try {
             const member = await interaction.guild.members.fetch(interaction.user.id);
-            if (member && LINKED_ROLE_ID && LINKED_ROLE_ID !== 'ВАШED_ROLE_ID_ЗДЕСЬ') {
+            if (member && LINKED_ROLE_ID) {
                 await member.roles.add(LINKED_ROLE_ID);
             }
         } catch (roleError) {

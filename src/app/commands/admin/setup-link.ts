@@ -1,5 +1,6 @@
 // Создание Embed для привязки
 
+import { SERVER_CONFIG } from '@/config/server.config';
 import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { 
     ApplicationCommandOptionType, 
@@ -12,7 +13,7 @@ import {
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',
-    guilds: [process.env.GUILD_ID as string]
+    guilds: SERVER_CONFIG.discord.guildId ? [SERVER_CONFIG.discord.guildId] : undefined
 };
 
 export const command: CommandData = {

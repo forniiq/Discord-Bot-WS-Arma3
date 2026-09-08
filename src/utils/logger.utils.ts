@@ -2,8 +2,9 @@ import { Client, EmbedBuilder, ChannelType, ColorResolvable } from 'discord.js';
 import { Logger } from 'commandkit/logger';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SERVER_CONFIG } from '@/config/server.config';
 
-const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string;
+const LOGS_CHANNEL_ID = SERVER_CONFIG.discord.channels.logs as string;
 
 // Путь к файлу логов в корне проекта
 const LOG_FILE_PATH = path.join(process.cwd(), 'bot.log');

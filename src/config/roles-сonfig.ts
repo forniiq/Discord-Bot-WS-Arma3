@@ -1,3 +1,5 @@
+import { SERVER_CONFIG } from "./server.config";
+
 export const RANKS = [
     "Новобранец", "Рядовой", "Ефрейтор", "Мл.Сержант", "Сержант", "Ст.Сержант", 
     "Старшина", "Прапорщик", "Ст.Прапорщик", "Мл.Лейтенант", "Лейтенант", 
@@ -154,7 +156,7 @@ const PROD_ROLES_CONFIG = {
 };
 
 // Проверяем, является ли текущий запуск тестовым сервером
-const isTestServer = process.env.IS_TEST_SERVER === "true" || process.env.NODE_ENV === "development";
+const isTestServer = SERVER_CONFIG.discord.isTestServer || process.env.NODE_ENV === "development";
 
 // Вспомогательная функция для обнуления ролей
 function nullifyRoles<T>(config: T): T {

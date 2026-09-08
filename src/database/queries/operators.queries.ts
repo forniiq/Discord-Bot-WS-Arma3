@@ -2,9 +2,8 @@ import { QueryTypes } from 'sequelize';
 import { sequelize } from '../connect';
 
 export interface OperatorRecord {
-    id?: number;
     DiscID: string;
-    name?: string;
+    Name?: string;
 }
 
 // Проверяет, является ли пользователь оператором бота
@@ -30,9 +29,9 @@ export async function getAllOperators(): Promise<OperatorRecord[]> {
 // Добавить оператора в базу данных
 export async function addOperator(discordId: string, name?: string): Promise<void> {
     await sequelize.query(
-        'INSERT INTO operators (DiscID, name) VALUES (:discordId, :name) ON DUPLICATE KEY UPDATE name = :name',
+        'INSERT INTO operators (DiscID, Name) VALUES (:discordId, :name) ON DUPLICATE KEY UPDATE Name = :name',
         {
-            replacements: { discordId, name: name ?? null },
+            replacements: {discordId, name: name ?? null},
             type: QueryTypes.INSERT,
         }
     );

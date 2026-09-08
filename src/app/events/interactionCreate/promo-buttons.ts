@@ -212,8 +212,11 @@ export default async function (interaction: Interaction) {
 
     // 5. КНОПКА «УДАЛИТЬ»
     if (interaction.customId.startsWith('btn_delete_promo:')) {
-        if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
-            return void interaction.reply({ content: '❌ У вас нет прав на удаление промокодов.', ephemeral: true });
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
         }
 
         // Защищаем тип через fallback на пустую строку

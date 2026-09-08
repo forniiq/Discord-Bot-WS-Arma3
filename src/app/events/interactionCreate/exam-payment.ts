@@ -12,9 +12,9 @@ import { EXAM_DATA, getRequiredInstructorRoleId, ExamItem } from '@/config/exams
 import { RANKS_DATA } from '@/config/ranks';
 import { processExamTransaction, getPlayerExpData } from '@/database/queries';
 import { updateBankDisplay } from '@/services/bank.service';
+import { SERVER_CONFIG } from '@/config/server.config';
 
-const INSTRUCTORS_CHAT_ID = process.env.INSTRUCTORS_CHAT_ID as string;
-const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID as string;
+const INSTRUCTORS_CHAT_ID = SERVER_CONFIG.discord.channels.instructorsChat as string;
 
 // Вспомогательная функция генерации карточки бойца
 async function generateStudentHeader(userId: string, stepInfo: string) {

@@ -7,10 +7,11 @@ import {
     ComponentType 
 } from 'discord.js';
 import { runBulkSync } from '@/services/bulk-sync.service';
+import { SERVER_CONFIG } from '@/config/server.config';
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',
-    guilds: [process.env.GUILD_ID as string]
+    guilds: SERVER_CONFIG.discord.guildId ? [SERVER_CONFIG.discord.guildId] : undefined
 };
 
 export const command: CommandData = {

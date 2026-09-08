@@ -8,10 +8,11 @@ import {
     ChannelType 
 } from 'discord.js';
 import { sendLog } from '@/utils/logger.utils';
+import { SERVER_CONFIG } from '@/config/server.config';
 
 export const metadata: CommandMetadata = {
     userPermissions: 'Administrator',
-    guilds: [process.env.GUILD_ID as string]
+    guilds: SERVER_CONFIG.discord.guildId ? [SERVER_CONFIG.discord.guildId] : undefined
 };
 
 export const command: CommandData = {

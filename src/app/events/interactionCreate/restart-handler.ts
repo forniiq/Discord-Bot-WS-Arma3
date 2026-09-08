@@ -10,6 +10,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { requireOperator } from '@/utils/operator.utils';
 import { getRandomRestartMessage } from '@/config/restart-messages';
+import { SERVER_CONFIG } from '@/config/server.config';
 
 // Пути к батникам рестарта
 const BATCH_PATHS = {
@@ -125,7 +126,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
         restartProcess.on('spawn', async () => {
             // Отправка анонса игрокам при успешном запуске скрипта
-            const ANNOUNCE_CHANNEL_ID = process.env.RESTART_ANNOUNCE_CHANNEL_ID;
+            const ANNOUNCE_CHANNEL_ID = SERVER_CONFIG.discord.channels.restartAnnounce;
 
             if (ANNOUNCE_CHANNEL_ID) {
                 try {

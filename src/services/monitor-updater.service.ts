@@ -6,17 +6,19 @@ import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
 import { getCurrentInfo, InfoData } from "@/database/queries/monitoring.queries";
 import { getApprovedUnitsSet } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
+import { SERVER_CONFIG } from '@/config/server.config';
+import { getMessageId, setMessageId } from '@/utils/message-state';
 
 // Пик онлайна за день
 let peakOnlineToday = 0;
 let peakResetDate = new Date().toDateString();
 
-const MAX_ONLINE = 90
+const MAX_ONLINE = SERVER_CONFIG.monitor.maxOnline;
 
 // Запуск мониторинга
 export async function StartMonitorUpdater(client: Client) {
-    const channelId = process.env.MONITOR_CHANNEL_ID!;
-    const messageId = process.env.MONITOR_MESSAGE_ID!;
+    const channelId = SERVER_CONFIG.discord.channels.monitor;
+    const messageId = getMessageId('monitor');
 
     // Получение канала
     const channel = await client.channels.fetch(channelId);
@@ -30,12 +32,14 @@ export async function StartMonitorUpdater(client: Client) {
 
     let message = null;
 
-    // Попытка восстановить старое сообщение мониторингка
+    // Попытка восстановить существующее сообщение мониторинга
     if (isValidId(messageId)) {
-        message = await textChannel.messages.fetch(messageId).catch(() => null);
+        message = await textChannel.messages
+            .fetch(messageId)
+            .catch(() => null);
     }
 
-    // Если нет сообщения - создание нового
+    // Если сообщение не найдено — создаём новое
     if (!message) {
         const players = await getOnlinePlayers();
         const zbd = await getCurrentInfo();
@@ -44,7 +48,19 @@ export async function StartMonitorUpdater(client: Client) {
             embeds: createEmbeds(players, zbd),
         });
 
-        sendLog("INFO", "Monitor", `Создан новый мониторинг онлайна: ${message.id}`);
+        setMessageId('monitor', message.id);
+
+        sendLog(
+            "INFO",
+            "Monitor",
+            `Создан новый мониторинг онлайна: ${message.id}`
+        );
+    } else {
+        sendLog(
+            "INFO",
+            "Monitor",
+            `Восстановлено существующее сообщение мониторинга: ${message.id}`
+        );
     }
 
     let isUpdating = false;
@@ -93,12 +109,10 @@ export async function StartMonitorUpdater(client: Client) {
         } finally {
             isUpdating = false;
         }
-    }, 30_000); // Обновление раз в 30 секунд
+    }, SERVER_CONFIG.monitor.updateInterval); // Обновление раз в 30 секунд
 }
 
-
-// Проверка валидности Discord message id
-function isValidId(id: string | undefined): id is string {
+function isValidId(id: string | null): id is string {
     return !!id && id.length > 10;
 }
 
@@ -279,7 +293,7 @@ function createHeaderEmbed(online: number, zbd: InfoData | null, color: number):
                 `СТАТУС         | ${getStatusText(online)}`,
                 `ОНЛАЙН         | ${online}/${MAX_ONLINE ?? 0}`,
                 `ПИК ЗА СУТКИ   | ${peakOnlineToday}`,
-                `СЕРВЕР         | ${process.env.SERVER_IP}:${process.env.SERVER_PORT}`,
+                `СЕРВЕР         | ${SERVER_CONFIG.arma.ip}:${SERVER_CONFIG.arma.port}`,
                 `НАГРУЗКА       | ${createProgressBar(online, MAX_ONLINE ?? 0)}`,
                 `               |`,
                 `ГОРОД          | ${zbdCity}`,

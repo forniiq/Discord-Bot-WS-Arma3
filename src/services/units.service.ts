@@ -1,7 +1,8 @@
 import { getAllUnits } from '@/database/queries';
 import { UNITS, ROLES_CONFIG } from '@/config/roles-сonfig';
+import { SERVER_CONFIG } from '@/config/server.config';
 
-const isTestServer = process.env.IS_TEST_SERVER === "true" || process.env.NODE_ENV === "development";
+const isTestServer = SERVER_CONFIG.discord.isTestServer || process.env.NODE_ENV === "development";
 
 export async function refreshUnitsCache(): Promise<void> {
     try {

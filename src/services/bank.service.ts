@@ -1,9 +1,12 @@
 import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { getBankBalance } from '../database/queries';
-import { sendLog } from '../utils/logger.utils';
+import { SERVER_CONFIG } from '@/config/server.config';
+import {
+    getMessageId,
+    setMessageId
+} from '@/utils/message-state';
 
-const BANK_CHANNEL_ID = process.env.BANK_CHANNEL_ID as string;
-let BANK_MESSAGE_ID = process.env.BANK_MESSAGE_ID as string | undefined;
+const BANK_CHANNEL_ID = SERVER_CONFIG.discord.channels.bank;
 
 let lastKnownBalance: number | null = null;
 
@@ -41,18 +44,26 @@ export async function updateBankDisplay(client: Client): Promise<void> {
         let message = null;
 
         // 3. Пытаемся найти существующее сообщение
-        if (BANK_MESSAGE_ID) {
-            message = await textChannel.messages.fetch(BANK_MESSAGE_ID).catch(() => null);
+        const bankMessageId = getMessageId('bank');
+
+        if (bankMessageId) {
+            message = await textChannel.messages
+                .fetch(bankMessageId)
+                .catch(() => null);
         }
 
         if (message) {
-            // Если сообщение существует — редактируем
             await message.edit({ embeds: [bankEmbed] });
         } else {
-            // Если сообщения нет — отправляем новое!
-            const newMessage = await textChannel.send({ embeds: [bankEmbed] });
-            BANK_MESSAGE_ID = newMessage.id;
-            console.log(`✅ [BankService] Отправлено новое банковое сообщение! Сохраните этот ID в .env: BANK_MESSAGE_ID=${newMessage.id}`);
+            const newMessage = await textChannel.send({
+                embeds: [bankEmbed]
+            });
+
+            setMessageId('bank', newMessage.id);
+
+            console.log(
+                `✅ [BankService] Создано новое банковое сообщение: ${newMessage.id}`
+            );
         }
 
         // Обновляем кэш баланса только ПОСЛЕ успешной отправки/изменения
@@ -64,11 +75,11 @@ export async function updateBankDisplay(client: Client): Promise<void> {
 }
 
 // Запускает постоянный цикл проверки банка
-export async function startBankAutoSync(client: Client, intervalMs: number = 60_000) {
+export async function startBankAutoSync(client: Client) {
     // Первоначальный запуск
     await updateBankDisplay(client);
 
     setInterval(async () => {
         await updateBankDisplay(client);
-    }, intervalMs);
+    }, SERVER_CONFIG.bank.updateInterval);
 }
