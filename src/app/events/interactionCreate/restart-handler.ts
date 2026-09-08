@@ -94,12 +94,22 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const batDir = path.dirname(batPath);
         const batFile = path.basename(batPath);
 
+        const cmdPath =
+            process.env.ComSpec ||
+            process.env.COMSPEC ||
+            'C:\\Windows\\System32\\cmd.exe';
+
+        console.log(`[ArmaRestart] CMD: ${cmdPath}`);
+        console.log(`[ArmaRestart] CWD: ${batDir}`);
+        console.log(`[ArmaRestart] BAT: ${batFile}`);
+
         const restartProcess = spawn(
-            'cmd.exe',
-            ['/c', batFile],
+            cmdPath,
+            ['/d', '/c', batFile],
             {
                 cwd: batDir,
-                windowsHide: false
+                windowsHide: false,
+                windowsVerbatimArguments: false
             }
         );
 
