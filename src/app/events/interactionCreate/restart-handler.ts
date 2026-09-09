@@ -1,8 +1,8 @@
 import { EventHandler } from 'commandkit';
-import { 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
+import {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
     ButtonStyle
 } from 'discord.js';
 import { sendLog, sendAdminLog } from '@/utils/logger.utils';
@@ -22,7 +22,10 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     if (!interaction.guild || !interaction.isButton()) return;
 
     // 1. Первичное нажатие на кнопки "Рестарт PvE" или "Рестарт PvP"
-    if (interaction.customId === 'btn_restart_pve' || interaction.customId === 'btn_restart_pvp') {
+    if (
+        interaction.customId === 'btn_restart_pve' ||
+        interaction.customId === 'btn_restart_pvp'
+    ) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
@@ -46,6 +49,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 .setLabel(`Подтвердить рестарт ${serverType}`)
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('⚠️'),
+
             new ButtonBuilder()
                 .setCustomId('cancel_restart')
                 .setLabel('Отмена')
@@ -60,7 +64,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 2. Нажатие кнопки "Отмена"
+    // 2. Отмена
     if (interaction.customId === 'cancel_restart') {
         return void interaction.update({
             content: '❌ **Перезапуск сервера отменен.**',
@@ -69,8 +73,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 3. Подтверждение перезапуска (confirm_restart_pve / confirm_restart_pvp)
-    if (interaction.customId === 'confirm_restart_pve' || interaction.customId === 'confirm_restart_pvp') {
+    // 3. Подтверждение рестарта
+    if (
+        interaction.customId === 'confirm_restart_pve' ||
+        interaction.customId === 'confirm_restart_pvp'
+    ) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
@@ -78,28 +85,35 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             });
         }
 
-        const type = interaction.customId === 'confirm_restart_pve' ? 'pve' : 'pvp';
+        const type =
+            interaction.customId === 'confirm_restart_pve'
+                ? 'pve'
+                : 'pvp';
+
         const isPvE = type === 'pve';
         const serverName = isPvE ? 'PvE' : 'PvP';
         const batPath = BATCH_PATHS[type];
 
-        // Ответ администратору, нажавшему кнопку
+        // Обновляем сообщение администратора
         await interaction.update({
             content: `⏳ **Запускается процесс рестарта ${serverName} сервера...**`,
             embeds: [],
             components: []
         });
 
-        // Запуск .bat файла через cmd.exe
+        // Пути
         const batDir = path.dirname(batPath);
         const batFile = path.basename(batPath);
 
-        const cmdPath = process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe';
+        const cmdPath =
+            process.env.ComSpec ??
+            'C:\\Windows\\System32\\cmd.exe';
 
         console.log(`[ArmaRestart] CMD: ${cmdPath}`);
         console.log(`[ArmaRestart] CWD: ${batDir}`);
         console.log(`[ArmaRestart] BAT: ${batFile}`);
 
+        // Запускаем BAT
         const restartProcess = spawn(
             cmdPath,
             ['/d', '/c', batFile],
@@ -109,16 +123,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             }
         );
 
-        restartProcess.stdout?.on('data', (data) => {
-            console.log(`[${serverName}] ${data.toString()}`);
-        });
-
-        restartProcess.stderr?.on('data', (data) => {
-            console.error(`[${serverName}] ${data.toString()}`);
-        });
-
         restartProcess.on('error', async (error) => {
-            console.error(`[ArmaRestart] Ошибка spawn:`, error);
+            console.error(
+                `[ArmaRestart] Ошибка запуска ${serverName}:`,
+                error
+            );
 
             await sendLog(
                 'ERROR',
@@ -127,13 +136,116 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             );
 
             await interaction.followUp({
-                content: `❌ **Не удалось запустить рестарт ${serverName}:**\n\`${error.message}\``,
+                content:
+                    `❌ **Не удалось запустить рестарт ${serverName}:**\n` +
+                    `\`${error.message}\``,
                 ephemeral: true
             }).catch(() => null);
         });
 
+        restartProcess.stdout?.on('data', (data) => {
+            console.log(
+                `[${serverName}] ${data.toString()}`
+            );
+        });
+
+        restartProcess.stderr?.on('data', (data) => {
+            console.error(
+                `[${serverName}] ${data.toString()}`
+            );
+        });
+
+        try {
+            const ANNOUNCE_CHANNEL_ID =
+                SERVER_CONFIG.discord.channels.restartAnnounce;
+
+            if (ANNOUNCE_CHANNEL_ID) {
+                const announceChannel =
+                    interaction.guild.channels.cache.get(
+                        ANNOUNCE_CHANNEL_ID
+                    ) ||
+                    await interaction.guild.channels.fetch(
+                        ANNOUNCE_CHANNEL_ID
+                    );
+
+                if (
+                    announceChannel &&
+                    announceChannel.isTextBased() &&
+                    'send' in announceChannel
+                ) {
+                    const restartMessage =
+                        getRandomRestartMessage(
+                            serverName,
+                            `<@${interaction.user.id}>`
+                        );
+
+                    const publicEmbed = new EmbedBuilder()
+                        .setTitle(restartMessage.title)
+                        .setDescription(restartMessage.description)
+                        .setColor(
+                            isPvE
+                                ? '#2ecc71'
+                                : '#e74c3c'
+                        )
+                        .setFooter({
+                            text: 'War Spectra'
+                        })
+                        .setTimestamp();
+
+                    await announceChannel.send({
+                        content: '@here',
+                        embeds: [publicEmbed]
+                    });
+
+                    console.log(
+                        `[ArmaRestart] Анонс ${serverName} отправлен.`
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(
+                `[ArmaRestart] Ошибка отправки анонса:`,
+                error
+            );
+
+            await sendLog(
+                'ERROR',
+                'ArmaRestart',
+                `Не удалось отправить анонс рестарта ${serverName}: ${error}`
+            );
+        }
+
+        await sendAdminLog({
+            title: '🔄 Рестарт сервера',
+
+            description:
+                `Администратор <@${interaction.user.id}> ` +
+                `запустил рестарт **${serverName}** сервера.`,
+
+            color: isPvE
+                ? '#57f287'
+                : '#ed4245',
+
+            executorId: interaction.user.id,
+
+            fields: [
+                {
+                    name: 'Сервер',
+                    value: `${serverName} Altis`,
+                    inline: true
+                },
+                {
+                    name: 'Файл',
+                    value: `\`${batPath}\``,
+                    inline: true
+                }
+            ]
+        });
+
         restartProcess.on('close', (code) => {
-            console.log(`[${serverName}] Батник завершился с кодом: ${code}`);
+            console.log(
+                `[${serverName}] Батник завершился с кодом: ${code}`
+            );
         });
     }
 };
