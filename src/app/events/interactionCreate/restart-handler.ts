@@ -94,32 +94,32 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const batDir = path.dirname(batPath);
         const batFile = path.basename(batPath);
 
-        const cmdPath =
-            process.env.ComSpec ||
-            process.env.COMSPEC ||
-            'C:\\Windows\\System32\\cmd.exe';
+        const cmdPath = process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe';
 
         console.log(`[ArmaRestart] CMD: ${cmdPath}`);
         console.log(`[ArmaRestart] CWD: ${batDir}`);
         console.log(`[ArmaRestart] BAT: ${batFile}`);
 
         const restartProcess = spawn(
-            'C:\\Windows\\System32\\cmd.exe',
-            ['/d', '/c', batPath],
+            cmdPath,
+            ['/d', '/c', batFile],
             {
+                cwd: batDir,
                 windowsHide: false
             }
         );
 
         restartProcess.stdout?.on('data', (data) => {
-            console.log(`[${serverName}] ${data}`);
+            console.log(`[${serverName}] ${data.toString()}`);
         });
 
         restartProcess.stderr?.on('data', (data) => {
-            console.error(`[${serverName}] ${data}`);
+            console.error(`[${serverName}] ${data.toString()}`);
         });
 
         restartProcess.on('error', async (error) => {
+            console.error(`[ArmaRestart] Ошибка spawn:`, error);
+
             await sendLog(
                 'ERROR',
                 'Arma3Restart',
@@ -130,51 +130,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 content: `❌ **Не удалось запустить рестарт ${serverName}:**\n\`${error.message}\``,
                 ephemeral: true
             }).catch(() => null);
-        });
-
-        restartProcess.on('spawn', async () => {
-            // Отправка анонса игрокам при успешном запуске скрипта
-            const ANNOUNCE_CHANNEL_ID = SERVER_CONFIG.discord.channels.restartAnnounce;
-
-            if (ANNOUNCE_CHANNEL_ID) {
-                try {
-                    const announceChannel = interaction.guild?.channels.cache.get(ANNOUNCE_CHANNEL_ID) 
-                        || await interaction.guild?.channels.fetch(ANNOUNCE_CHANNEL_ID);
-
-                    if (announceChannel && announceChannel.isTextBased() && 'send' in announceChannel) {
-                        const restartMessage = getRandomRestartMessage(
-                            serverName,
-                            `<@${interaction.user.id}>`
-                        );
-
-                        const publicEmbed = new EmbedBuilder()
-                            .setTitle(restartMessage.title)
-                            .setDescription(restartMessage.description)
-                            .setColor(isPvE ? '#2ecc71' : '#e74c3c')
-                            .setFooter({ text: 'War Spectra' })
-                            .setTimestamp();
-
-                        await announceChannel.send({
-                            content: '@here',
-                            embeds: [publicEmbed]
-                        });
-                    }
-                } catch (err) {
-                    await sendLog('ERROR', 'ArmaRestart', `Не удалось отправить анонс в канал ${ANNOUNCE_CHANNEL_ID}: ${err}`);
-                }
-            }
-
-            // Запись в лог аудита администраторов
-            await sendAdminLog({
-                title: '🔄 Рестарт сервера',
-                description: `Администратор <@${interaction.user.id}> запустил рестарт **${serverName}** сервера.`,
-                color: isPvE ? '#57f287' : '#ed4245',
-                executorId: interaction.user.id,
-                fields: [
-                    { name: 'Сервер', value: `${serverName} Altis`, inline: true },
-                    { name: 'Файл', value: `\`${batPath}\``, inline: true }
-                ]
-            });
         });
 
         restartProcess.on('close', (code) => {
