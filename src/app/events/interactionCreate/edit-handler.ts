@@ -10,7 +10,14 @@ import {
 } from 'discord.js';
 import { findPlayer, updatePlayerField } from '@/database/queries';
 import { buildPlayerDashboard } from '@/utils/dashboard.utils';
-import { TOGGLE_CATEGORIES, RANKS, UNITS, PRESET_COLORS } from '@/config/edit-сategories';
+import {
+    TOGGLE_CATEGORIES,
+    RANKS,
+    UNITS,
+    PRESET_COLORS,
+    ADMIN_LEVELS,
+    ADMIN_PANEL_OPTIONS
+} from '@/config/edit-сategories';
 import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
 import { sendLog } from '@/utils/logger.utils';
 import { syncPlayerProfile } from '@/services/player-sync.service';
@@ -123,6 +130,61 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         }
 
         // Г) Флажки / Допуски
+        if (selectedCategory === "admin") {
+            const adminArray = parseArmaArray(player.pAdmin);
+
+            const currentAdminLevel = adminArray[0] ?? 0;
+            const currentAdminPanel = adminArray[1] ?? 0;
+            const currentExpBonus = adminArray[3] ?? 0;
+
+            // SelectMenu уровня администрации
+            const adminLevelMenu = new StringSelectMenuBuilder()
+                .setCustomId(`save_admin_level:${pUID}`)
+                .setPlaceholder("Выберите уровень администрации");
+
+            Object.entries(ADMIN_LEVELS).forEach(([value, label]) => {
+                adminLevelMenu.addOptions({
+                    label,
+                    value,
+                    default: Number(value) === currentAdminLevel
+                });
+            });
+
+            // SelectMenu доступа к ВП-панели
+            const adminPanelMenu = new StringSelectMenuBuilder()
+                .setCustomId(`save_admin_panel:${pUID}`)
+                .setPlaceholder("Доступ к ВП-панели");
+
+            Object.entries(ADMIN_PANEL_OPTIONS).forEach(([value, label]) => {
+                adminPanelMenu.addOptions({
+                    label,
+                    value,
+                    default: Number(value) === currentAdminPanel
+                });
+            });
+
+            // Кнопка изменения бонуса к опыту
+            const bonusButton = new ButtonBuilder()
+                .setCustomId(`edit_admin_bonus:${pUID}`)
+                .setLabel("✏️ Изменить бонус к опыту")
+                .setStyle(ButtonStyle.Secondary);
+
+            return void await interaction.update({
+                content:
+                    `🛡️ **Редактирование админ-прав игрока:** ${player.pName}\n\n` +
+                    `**Текущие значения:**\n` +
+                    `• Уровень администрации: ${ADMIN_LEVELS[String(currentAdminLevel)] ?? "Неизвестно"}\n` +
+                    `• ВП-панель: ${currentAdminPanel === 1 ? "Есть доступ" : "Нет доступа"}\n` +
+                    `• Бонус к опыту: ${currentExpBonus}\n\n` +
+                    `Выберите, что хотите изменить:`,
+                components: [
+                    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(adminLevelMenu),
+                    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(adminPanelMenu),
+                    new ActionRowBuilder<ButtonBuilder>().addComponents(bonusButton)
+                ]
+            });
+        }
+
         const categoryConfig = TOGGLE_CATEGORIES[selectedCategory as keyof typeof TOGGLE_CATEGORIES];
         if (categoryConfig) {
             const currentArray = parseArmaArray((player as any)[categoryConfig.dbColumn]);
@@ -210,6 +272,140 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     }
 
     // 3. Сохранение Флажков / Допусков
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("save_admin_level:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const pUID = interaction.customId.split(":")[1];
+
+        if (!pUID) return;
+
+        const newAdminLevel = Number(interaction.values[0]);
+
+        if (!Number.isInteger(newAdminLevel) || newAdminLevel < 0 || newAdminLevel > 7) {
+            return void interaction.reply({
+                content: "❌ Некорректный уровень администрации.",
+                ephemeral: true
+            });
+        }
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const adminArray = parseArmaArray(player.pAdmin);
+
+        while (adminArray.length < 4) {
+            adminArray.push(0);
+        }
+
+        // Меняем только индекс 0
+        adminArray[0] = newAdminLevel;
+
+        await updatePlayerField(
+            pUID,
+            "pAdmin",
+            JSON.stringify(adminArray)
+        );
+
+        let updatedPlayer = await findPlayer({ steamId: pUID });
+
+        if (!updatedPlayer) return;
+
+        await syncPlayerProfile(interaction.guild as any, updatedPlayer);
+
+        updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
+
+        await sendLog(
+            'INFO',
+            'AdminEdit',
+            `Администратор \`${interaction.user.tag}\` изменил уровень администрации игроку \`${updatedPlayer.pName}\` на **${ADMIN_LEVELS[String(newAdminLevel)]}**`
+        );
+
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+
+        return void await interaction.update({
+            content: "✅ Уровень администрации обновлён и роли синхронизированы!",
+            ...dashboard
+        });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("save_admin_panel:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const pUID = interaction.customId.split(":")[1];
+
+        if (!pUID) return;
+
+        const newAdminPanel = Number(interaction.values[0]);
+
+        if (newAdminPanel !== 0 && newAdminPanel !== 1) {
+            return void interaction.reply({
+                content: "❌ Некорректное значение ВП-панели.",
+                ephemeral: true
+            });
+        }
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const adminArray = parseArmaArray(player.pAdmin);
+
+        while (adminArray.length < 4) {
+            adminArray.push(0);
+        }
+
+        // Меняем только индекс 1
+        adminArray[1] = newAdminPanel;
+
+        await updatePlayerField(
+            pUID,
+            "pAdmin",
+            JSON.stringify(adminArray)
+        );
+
+        let updatedPlayer = await findPlayer({ steamId: pUID });
+
+        if (!updatedPlayer) return;
+
+        await syncPlayerProfile(interaction.guild as any, updatedPlayer);
+
+        updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
+
+        await sendLog(
+            'INFO',
+            'AdminEdit',
+            `Администратор \`${interaction.user.tag}\` изменил доступ к ВП-панели игроку \`${updatedPlayer.pName}\` на **${newAdminPanel === 1 ? "включён" : "выключен"}**`
+        );
+
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+
+        return void await interaction.update({
+            content: "✅ Доступ к ВП-панели обновлён и роли синхронизированы!",
+            ...dashboard
+        });
+    }
+
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("save_toggles:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
@@ -300,6 +496,49 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             .setRequired(false);
 
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(textInput));
+        return void await interaction.showModal(modal);
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("edit_admin_bonus:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const pUID = interaction.customId.split(":")[1];
+
+        if (!pUID) return;
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const adminArray = parseArmaArray(player.pAdmin);
+        const currentExpBonus = adminArray[3] ?? 0;
+
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_save_admin_bonus:${pUID}`)
+            .setTitle("Изменение бонуса к опыту");
+
+        const bonusInput = new TextInputBuilder()
+            .setCustomId("expBonus")
+            .setLabel("Бонус к опыту")
+            .setPlaceholder("Например: 0.3, 1, 1.2")
+            .setValue(String(currentExpBonus))
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(bonusInput)
+        );
+
         return void await interaction.showModal(modal);
     }
 
@@ -405,6 +644,93 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         await interaction.deferUpdate();
         const dashboard = buildPlayerDashboard(updatedPlayer);
         return void await interaction.editReply({ content: "✅ Кастомный префикс (ручной ввод) успешно обновлен!", ...dashboard });
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_admin_bonus:")) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const pUID = interaction.customId.split(":")[1];
+
+        if (!pUID) return;
+
+        const bonusText = interaction.fields
+            .getTextInputValue("expBonus")
+            .trim();
+
+        if (!bonusText) {
+            return void interaction.reply({
+                content: "❌ Введите бонус к опыту.",
+                ephemeral: true
+            });
+        }
+
+        const newExpBonus = Number(bonusText);
+
+        if (!Number.isFinite(newExpBonus) || newExpBonus < 0) {
+            return void interaction.reply({
+                content: "❌ Некорректный бонус к опыту. Введите число, например `0.3`, `1` или `1.2`.",
+                ephemeral: true
+            });
+        }
+
+        if (!Number.isFinite(newExpBonus) || newExpBonus < 0) {
+            return void interaction.reply({
+                content: "❌ Некорректный бонус к опыту. Введите число, например `0.3`, `1` или `1.2`.",
+                ephemeral: true
+            });
+        }
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const adminArray = parseArmaArray(player.pAdmin);
+
+        while (adminArray.length < 4) {
+            adminArray.push(0);
+        }
+
+        // Меняем только индекс 3
+        adminArray[3] = newExpBonus;
+
+        await updatePlayerField(
+            pUID,
+            "pAdmin",
+            JSON.stringify(adminArray)
+        );
+
+        let updatedPlayer = await findPlayer({ steamId: pUID });
+
+        if (!updatedPlayer) return;
+
+        await syncPlayerProfile(interaction.guild as any, updatedPlayer);
+
+        updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
+
+        await sendLog(
+            'INFO',
+            'AdminEdit',
+            `Администратор \`${interaction.user.tag}\` изменил бонус к опыту игроку \`${updatedPlayer.pName}\` на **${newExpBonus}**`
+        );
+
+        await interaction.deferUpdate();
+
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+
+        return void await interaction.editReply({
+            content: "✅ Бонус к опыту обновлён и роли синхронизированы!",
+            ...dashboard
+        });
     }
 };
 

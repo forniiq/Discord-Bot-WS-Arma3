@@ -57,7 +57,12 @@ export const TOGGLE_CATEGORIES = {
         dbColumn: "pBoss",
         title: "Допуски Руководства",
         options: ["Админ", "Тех.Поддержка", "Заместитель", "Разработчик"]
-    }
+    },
+    admin: {
+        dbColumn: "pAdmin",
+        title: "Админ-права",
+        options: []
+    },
 };
 
 export const PRESET_COLORS = [
@@ -69,3 +74,19 @@ export const PRESET_COLORS = [
     { label: '🟣 Пурпурный', value: '#8A2BE2', emoji: '🟣' },
     { label: '⚪ Белый / Стандартный', value: '#FFFFFF', emoji: '⚪' },
 ];
+
+export const ADMIN_LEVELS: Record<string, string> = {
+    "0": "Нет прав",
+    "1": "Главком ВС РФ",
+    "2": "Руководитель Проекта",
+    "3": "Администратор",
+    "4": "Главный Администратор",
+    "5": "Куратор Администрации",
+    "6": "Зам. Руководителя Проекта",
+    "7": "Тех. Зевс"
+};
+
+export const ADMIN_PANEL_OPTIONS: Record<string, string> = {
+    "0": "Нет доступа к ВП-панели",
+    "1": "Есть доступ к ВП-панели"
+};

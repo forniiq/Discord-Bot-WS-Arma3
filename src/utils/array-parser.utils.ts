@@ -1,9 +1,14 @@
 // Утилита работы с битовыми массивами БД
 
-export function parseArmaArray(str: string | null | undefined): number[] {
+export function parseArmaArray(
+    str: string | null | undefined
+): number[] {
     if (!str) return [];
+
     try {
-        return JSON.parse(str);
+        const parsed = JSON.parse(str);
+
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
     }
