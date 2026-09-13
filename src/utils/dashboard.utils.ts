@@ -45,7 +45,13 @@ export function buildPlayerDashboard(player: PlayerInfo) {
             { label: '🧭 Допуски РП (Флажки)', value: 'rp', emoji: '🧭' },
             { label: '📍 Инструктора (Флажки)', value: 'kmb', emoji: '📍' },
             { label: '📼 Курсы (Флажки)', value: 'courses', emoji: '📼' },
-            { label: '👑 Адм. Начи / Руководство', value: 'boss', emoji: '👑' }
+            { label: '👑 Адм. Начи / Руководство', value: 'boss', emoji: '👑' },
+            {
+                label: '🛡️ Админ-права',
+                description: 'Уровень администрации, ВП-панель и бонус к опыту',
+                value: 'admin',
+                emoji: '🛡️'
+            }
         );
 
     const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
