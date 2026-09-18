@@ -1,11 +1,10 @@
 import {
     createItem,
-    deleteExpiredItems,
     deleteItem,
-    getItemById,
-    getItemsBySteamId,
+    findItemById,
+    findItemsBySteamId,
     updateItem,
-    type ItemInfo,
+    deleteExpiredItems,
 } from '@/database/queries/items.queries';
 
 import { findPlayer } from '@/database/queries/players.queries';
@@ -58,9 +57,7 @@ export function isValidSteamId(
     return /^\d{17}$/.test(steamid);
 }
 
-export function isValidDays(
-    days: number
-): boolean {
+function isValidDays(days: number): boolean {
     return (
         Number.isInteger(days) &&
         days > 0 &&
@@ -68,23 +65,12 @@ export function isValidDays(
     );
 }
 
-export async function getPlayerItems(
-    steamid: string
-): Promise<ItemInfo[]> {
-    return getItemsBySteamId(steamid);
-}
-
 export async function addPlayerItem(data: {
     steamid: string;
     className: string;
-    code: ItemSide;
+    code: string;
     days: number;
-}): Promise<{
-    success: boolean;
-    message?: string;
-    item?: ItemInfo;
-    playerName?: string;
-}> {
+}) {
     if (!isValidSteamId(data.steamid)) {
         return {
             success: false,
@@ -92,22 +78,17 @@ export async function addPlayerItem(data: {
         };
     }
 
-    const className =
-        data.className.trim();
-
-    if (!className) {
+    if (!data.className.trim()) {
         return {
             success: false,
-            message:
-                'ClassName не может быть пустым.',
+            message: 'ClassName не может быть пустым.',
         };
     }
 
     if (!isValidItemSide(data.code)) {
         return {
             success: false,
-            message:
-                'Указана некорректная сторона.',
+            message: 'Некорректная сторона.',
         };
     }
 
@@ -115,30 +96,28 @@ export async function addPlayerItem(data: {
         return {
             success: false,
             message:
-                'Количество дней должно быть от 1 до 3650.',
+                'Срок должен быть целым числом от 1 до 3650 дней.',
         };
     }
 
-    const player =
-        await findPlayer({
-            steamId: data.steamid,
-        });
+    const player = await findPlayer({
+        steamId: data.steamid,
+    });
 
     if (!player) {
         return {
             success: false,
             message:
-                `Игрок с SteamID \`${data.steamid}\` не найден в базе.`,
+                'Игрок не найден в базе.',
         };
     }
 
-    const item =
-        await createItem({
-            steamid: data.steamid,
-            className,
-            code: data.code,
-            days: data.days,
-        });
+    const item = await createItem({
+        steamid: data.steamid,
+        className: data.className.trim(),
+        code: data.code,
+        days: data.days,
+    });
 
     if (!item) {
         return {
@@ -155,39 +134,22 @@ export async function addPlayerItem(data: {
     };
 }
 
-export async function getPlayerItem(
-    id: number
-): Promise<ItemInfo | null> {
-    return getItemById(id);
-}
-
 export async function editPlayerItem(
-    id: number,
+    itemId: number,
     data: {
         className: string;
-        code: ItemSide;
+        code: string;
         days: number;
     }
-): Promise<{
-    success: boolean;
-    message?: string;
-    oldItem?: ItemInfo;
-    item?: ItemInfo;
-}> {
-    const oldItem =
-        await getItemById(id);
-
-    if (!oldItem) {
+) {
+    if (!Number.isInteger(itemId)) {
         return {
             success: false,
-            message: 'Item не найден.',
+            message: 'Некорректный ID item.',
         };
     }
 
-    const className =
-        data.className.trim();
-
-    if (!className) {
+    if (!data.className.trim()) {
         return {
             success: false,
             message:
@@ -199,7 +161,7 @@ export async function editPlayerItem(
         return {
             success: false,
             message:
-                'Указана некорректная сторона.',
+                'Некорректная сторона.',
         };
     }
 
@@ -207,18 +169,32 @@ export async function editPlayerItem(
         return {
             success: false,
             message:
-                'Количество дней должно быть от 1 до 3650.',
+                'Срок должен быть целым числом от 1 до 3650 дней.',
         };
     }
 
-    const success =
-        await updateItem(id, {
-            className,
+    const oldItem =
+        await findItemById(itemId);
+
+    if (!oldItem) {
+        return {
+            success: false,
+            message:
+                'Item не найден.',
+        };
+    }
+
+    const item = await updateItem(
+        itemId,
+        {
+            className:
+                data.className.trim(),
             code: data.code,
             days: data.days,
-        });
+        }
+    );
 
-    if (!success) {
+    if (!item) {
         return {
             success: false,
             message:
@@ -226,37 +202,31 @@ export async function editPlayerItem(
         };
     }
 
-    const item =
-        await getItemById(id);
-
     return {
         success: true,
+        item,
         oldItem,
-        item: item ?? undefined,
     };
 }
 
 export async function removePlayerItem(
-    id: number
-): Promise<{
-    success: boolean;
-    message?: string;
-    item?: ItemInfo;
-}> {
+    itemId: number
+) {
     const item =
-        await getItemById(id);
+        await findItemById(itemId);
 
     if (!item) {
         return {
             success: false,
-            message: 'Item не найден.',
+            message:
+                'Item уже был удалён.',
         };
     }
 
-    const success =
-        await deleteItem(id);
+    const deleted =
+        await deleteItem(itemId);
 
-    if (!success) {
+    if (!deleted) {
         return {
             success: false,
             message:
@@ -270,6 +240,18 @@ export async function removePlayerItem(
     };
 }
 
-export async function cleanupExpiredItems(): Promise<number> {
+export async function getPlayerItems(
+    steamid: string
+) {
+    return findItemsBySteamId(steamid);
+}
+
+export async function getPlayerItem(
+    itemId: number
+) {
+    return findItemById(itemId);
+}
+
+export async function cleanupExpiredItems() {
     return deleteExpiredItems();
 }
