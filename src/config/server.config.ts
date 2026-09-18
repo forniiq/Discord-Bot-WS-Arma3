@@ -5,6 +5,7 @@ export const SERVER_CONFIG = {
 
         roles: {
             linked: '1299753624561258577', // ID Роли "Привязан"
+            itemsManager: '1461446002304094352', // ID Роли "Казначейство"
         },
 
         channels: {

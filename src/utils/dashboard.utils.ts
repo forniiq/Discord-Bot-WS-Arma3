@@ -2,7 +2,12 @@
 
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { PlayerInfo } from '@/database/queries';
-import { RANKS, UNITS, TOGGLE_CATEGORIES } from '@/config/edit-сategories';
+import {
+    RANKS,
+    UNITS,
+    TOGGLE_CATEGORIES,
+    ADMIN_LEVELS
+} from '@/config/edit-сategories';
 import { parseArmaArray } from './array-parser.utils';
 
 export function buildPlayerDashboard(player: PlayerInfo) {
@@ -15,19 +20,66 @@ export function buildPlayerDashboard(player: PlayerInfo) {
         return active.length > 0 ? active.join(', ') : '❌ Нет';
     };
 
+    const adminArray = parseArmaArray(player.pAdmin);
+    const adminLevel = adminArray[0] ?? 0;
+    const expBonus = adminArray[3] ?? 0;
+
     const embed = new EmbedBuilder()
         .setTitle(`👤 Профиль игрока: ${player.pName}`)
         .setColor(0x2b2d31)
         .addFields(
-            { name: '🆔 Идентификаторы', value: `**pUID:** \`${player.pUID}\`\n**Discord ID:** ${player.DiscID ? `<@${player.DiscID}>` : 'Не привязан'}`, inline: true },
-            { name: '🪖 Статус', value: `**Звание:** ${rankName}\n**Отряд:** ${unitName}`, inline: true },
-            { name: '📊 Статистика', value: `**Опыт:** ${player.pExp}\n**Карма:** ${player.pKarma}`, inline: true },
-            { name: '🏷️ Кастомный префикс', value: `\`${player.pTitle || 'Отсутствует'}\``, inline: false },
-            { name: '🛩️ ВВС', value: formatToggles(player.pCYP, TOGGLE_CATEGORIES.vvs.options), inline: true },
-            { name: '🚜 БТВ', value: formatToggles(player.pBTV, TOGGLE_CATEGORIES.btv.options), inline: true },
-            { name: '🧭 РП', value: formatToggles(player.pRP, TOGGLE_CATEGORIES.rp.options), inline: true },
-            { name: '📍 Инструктора', value: formatToggles(player.pKMB, TOGGLE_CATEGORIES.kmb.options), inline: false },
-            { name: '📼 Курсы', value: formatToggles(player.pSkill, TOGGLE_CATEGORIES.courses.options), inline: false }
+            { 
+                name: '🆔 Идентификаторы', 
+                value: `**pUID:** \`${player.pUID}\`\n**Discord ID:** ${player.DiscID ? `<@${player.DiscID}>` : 'Не привязан'}`, 
+                inline: true 
+            },
+            { 
+                name: '🪖 Статус', 
+                value: `**Звание:** ${rankName}\n**Отряд:** ${unitName}`, 
+                inline: true 
+            },
+            { 
+                name: '📊 Статистика', 
+                value: `**Опыт:** ${player.pExp}\n**Карма:** ${player.pKarma}`, 
+                inline: true 
+            },
+
+            ...(adminLevel > 0 ? [{
+                name: '🛡️ Администрация',
+                value: `**Уровень:** ${ADMIN_LEVELS[String(adminLevel)] ?? `Уровень ${adminLevel}`}\n**Буст опыта:** ${expBonus}`,
+                inline: false
+            }] : []),
+
+            { 
+                name: '🏷️ Кастомный префикс', 
+                value: `\`${player.pTitle || 'Отсутствует'}\``, 
+                inline: false 
+            },
+            { 
+                name: '🛩️ ВВС', 
+                value: formatToggles(player.pCYP, TOGGLE_CATEGORIES.vvs.options), 
+                inline: true 
+            },
+            { 
+                name: '🚜 БТВ', 
+                value: formatToggles(player.pBTV, TOGGLE_CATEGORIES.btv.options), 
+                inline: true 
+            },
+            { 
+                name: '🧭 РП', 
+                value: formatToggles(player.pRP, TOGGLE_CATEGORIES.rp.options), 
+                inline: true 
+            },
+            { 
+                name: '📍 Инструктора', 
+                value: formatToggles(player.pKMB, TOGGLE_CATEGORIES.kmb.options), 
+                inline: false 
+            },
+            { 
+                name: '📼 Курсы', 
+                value: formatToggles(player.pSkill, TOGGLE_CATEGORIES.courses.options), 
+                inline: false 
+            }
         )
         .setFooter({ text: 'Используйте элементы управления ниже для быстрого редактирования' });
 

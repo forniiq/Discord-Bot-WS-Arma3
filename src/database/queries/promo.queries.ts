@@ -141,7 +141,7 @@ export async function redeemPromocode(discId: string, promoName: string): Promis
                     CAST(PromoActiv AS SIGNED) as PromoActiv,
                     UsedUsers,
                     ExpiresAt
-             FROM promocod WHERE Name = :name FOR UPDATE`,
+                FROM promocod WHERE Name = :name FOR UPDATE`,
             {
                 replacements: { name: promoName },
                 type: QueryTypes.SELECT,

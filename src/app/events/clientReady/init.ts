@@ -1,4 +1,5 @@
 import { startBankAutoSync } from '@/services/bank.service';
+import { startItemsExpirationJob } from '@/services/items-expiration.service';
 import { StartMonitorUpdater } from '@/services/monitor-updater.service';
 import { refreshUnitsCache } from '@/services/units.service';
 import { startZbdChecker } from '@/services/zbd-checker.service';
@@ -15,6 +16,7 @@ const handler: EventHandler<'clientReady'> = async (client: any) => {
   startZbdChecker(client, false);
   startBankAutoSync(client);
   await refreshUnitsCache();
+  startItemsExpirationJob();
 };
 
 export default handler;
