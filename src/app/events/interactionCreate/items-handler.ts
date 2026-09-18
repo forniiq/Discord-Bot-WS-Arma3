@@ -22,9 +22,10 @@ import {
     getItemSideName,
     isValidItemSide,
     isValidSteamId,
-    parseExpirationDate,
     removePlayerItem,
 } from '@/services/items.service';
+
+import crypto from 'node:crypto';
 
 import { findPlayer } from '@/database/queries/players.queries';
 
@@ -32,6 +33,106 @@ import { sendAdminLog } from '@/utils/logger.utils';
 
 const ITEMS_ROLE_ID =
     SERVER_CONFIG.discord.roles.itemsManager;
+
+interface PendingItem {
+    steamid: string;
+    className: string;
+    days: number;
+    userId: string;
+    expiresAt: number;
+}
+
+const pendingItems = new Map<
+    string,
+    PendingItem
+>();
+
+function createPendingItem(
+    data: Omit<PendingItem, 'expiresAt'>
+): string {
+    const token =
+        crypto.randomUUID();
+
+    pendingItems.set(token, {
+        ...data,
+        expiresAt:
+            Date.now() + 5 * 60 * 1000,
+    });
+
+    return token;
+}
+
+function getPendingItem(
+    token: string,
+    userId: string
+): PendingItem | null {
+    const data =
+        pendingItems.get(token);
+
+    if (!data) {
+        return null;
+    }
+
+    if (
+        data.userId !== userId ||
+        data.expiresAt < Date.now()
+    ) {
+        pendingItems.delete(token);
+        return null;
+    }
+
+    return data;
+}
+
+interface PendingEditItem {
+    itemId: number;
+    className: string;
+    days: number;
+    userId: string;
+    expiresAt: number;
+}
+
+const pendingEditItems = new Map<
+    string,
+    PendingEditItem
+>();
+
+function createPendingEditItem(
+    data: Omit<PendingEditItem, 'expiresAt'>
+): string {
+    const token =
+        crypto.randomUUID();
+
+    pendingEditItems.set(token, {
+        ...data,
+        expiresAt:
+            Date.now() + 5 * 60 * 1000,
+    });
+
+    return token;
+}
+
+function getPendingEditItem(
+    token: string,
+    userId: string
+): PendingEditItem | null {
+    const data =
+        pendingEditItems.get(token);
+
+    if (!data) {
+        return null;
+    }
+
+    if (
+        data.userId !== userId ||
+        data.expiresAt < Date.now()
+    ) {
+        pendingEditItems.delete(token);
+        return null;
+    }
+
+    return data;
+}
 
 async function hasItemsAccess(
     interaction: any
@@ -97,65 +198,6 @@ async function getPlayerName(
     return player?.pName ?? 'Неизвестный игрок';
 }
 
-function createAddItemModal(): ModalBuilder {
-    const modal = new ModalBuilder()
-        .setCustomId('items_modal_add')
-        .setTitle('Добавление донатного item');
-
-    const steamIdInput = new TextInputBuilder()
-        .setCustomId('steamid')
-        .setLabel('SteamID64')
-        .setPlaceholder('76561198390295330')
-        .setStyle(TextInputStyle.Short)
-        .setMinLength(17)
-        .setMaxLength(17)
-        .setRequired(true);
-
-    const classNameInput = new TextInputBuilder()
-        .setCustomId('className')
-        .setLabel('ClassName')
-        .setPlaceholder('CUP_U_C_Rocker_04')
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(255)
-        .setRequired(true);
-
-    const sideInput = new TextInputBuilder()
-        .setCustomId('code')
-        .setLabel('Сторона')
-        .setPlaceholder(
-            'independent / blufor / Opfor / true'
-        )
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(20)
-        .setRequired(true);
-
-    const expirationInput = new TextInputBuilder()
-        .setCustomId('srok')
-        .setLabel('Срок окончания')
-        .setPlaceholder(
-            '2026-12-31 23:59:59'
-        )
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(19)
-        .setRequired(true);
-
-    modal.addComponents(
-        new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(steamIdInput),
-
-        new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(classNameInput),
-
-        new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(sideInput),
-
-        new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(expirationInput),
-    );
-
-    return modal;
-}
-
 function createPlayerSearchModal(): ModalBuilder {
     const modal = new ModalBuilder()
         .setCustomId('items_modal_player')
@@ -178,83 +220,113 @@ function createPlayerSearchModal(): ModalBuilder {
     return modal;
 }
 
+function createAddItemModal(): ModalBuilder {
+    const modal = new ModalBuilder()
+        .setCustomId('items_modal_add')
+        .setTitle('Добавление донатного item');
+
+    const steamIdInput =
+        new TextInputBuilder()
+            .setCustomId('steamid')
+            .setLabel('SteamID64 игрока')
+            .setPlaceholder(
+                '76561198390295330'
+            )
+            .setStyle(TextInputStyle.Short)
+            .setMinLength(17)
+            .setMaxLength(17)
+            .setRequired(true);
+
+    const classNameInput =
+        new TextInputBuilder()
+            .setCustomId('className')
+            .setLabel('ClassName')
+            .setPlaceholder(
+                'CUP_U_C_Rocker_04'
+            )
+            .setStyle(TextInputStyle.Short)
+            .setMaxLength(255)
+            .setRequired(true);
+
+    const daysInput =
+        new TextInputBuilder()
+            .setCustomId('days')
+            .setLabel('Срок доната в днях')
+            .setPlaceholder('Например: 30')
+            .setStyle(TextInputStyle.Short)
+            .setMinLength(1)
+            .setMaxLength(4)
+            .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder<TextInputBuilder>()
+            .addComponents(steamIdInput),
+
+        new ActionRowBuilder<TextInputBuilder>()
+            .addComponents(classNameInput),
+
+        new ActionRowBuilder<TextInputBuilder>()
+            .addComponents(daysInput)
+    );
+
+    return modal;
+}
+
 function createEditItemModal(
     item: {
         id: number;
         className: string;
-        code: string;
         srok: Date;
     }
 ): ModalBuilder {
     const modal = new ModalBuilder()
-        .setCustomId(`items_modal_edit:${item.id}`)
+        .setCustomId(
+            `items_modal_edit:${item.id}`
+        )
         .setTitle('Редактирование item');
 
-    const classNameInput = new TextInputBuilder()
-        .setCustomId('className')
-        .setLabel('ClassName')
-        .setValue(item.className)
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(255)
-        .setRequired(true);
+    const classNameInput =
+        new TextInputBuilder()
+            .setCustomId('className')
+            .setLabel('ClassName')
+            .setValue(item.className)
+            .setStyle(TextInputStyle.Short)
+            .setMaxLength(255)
+            .setRequired(true);
 
-    const sideInput = new TextInputBuilder()
-        .setCustomId('code')
-        .setLabel('Сторона')
-        .setValue(item.code)
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(20)
-        .setRequired(true);
+    const remainingDays = Math.max(
+        1,
+        Math.ceil(
+            (
+                new Date(item.srok).getTime() -
+                Date.now()
+            ) /
+            (1000 * 60 * 60 * 24)
+        )
+    );
 
-    const expirationInput = new TextInputBuilder()
-        .setCustomId('srok')
-        .setLabel('Срок окончания')
-        .setValue(formatDateForInput(item.srok))
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(19)
-        .setRequired(true);
+    const daysInput =
+        new TextInputBuilder()
+            .setCustomId('days')
+            .setLabel('Срок доната в днях')
+            .setValue(
+                String(remainingDays)
+            )
+            .setPlaceholder('Например: 30')
+            .setStyle(TextInputStyle.Short)
+            .setMinLength(1)
+            .setMaxLength(4)
+            .setRequired(true);
 
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>()
             .addComponents(classNameInput),
 
         new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(sideInput),
-
-        new ActionRowBuilder<TextInputBuilder>()
-            .addComponents(expirationInput),
+            .addComponents(daysInput)
     );
 
     return modal;
-}
-
-function formatDateForInput(
-    date: Date
-): string {
-    const d = new Date(date);
-
-    const year = d.getFullYear();
-    const month = String(
-        d.getMonth() + 1
-    ).padStart(2, '0');
-
-    const day = String(
-        d.getDate()
-    ).padStart(2, '0');
-
-    const hours = String(
-        d.getHours()
-    ).padStart(2, '0');
-
-    const minutes = String(
-        d.getMinutes()
-    ).padStart(2, '0');
-
-    const seconds = String(
-        d.getSeconds()
-    ).padStart(2, '0');
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 async function showPlayerItems(
@@ -455,132 +527,133 @@ const handler: EventHandler<'interactionCreate'> =
         interaction.isModalSubmit() &&
         interaction.customId === 'items_modal_add'
     ) {
-        if (!await hasItemsAccess(interaction)) {
-            return void interaction.reply({
-                content:
-                    '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
-            });
-        }
-
         const steamid =
-            interaction.fields
-                .getTextInputValue('steamid')
-                .trim();
+    interaction.fields
+        .getTextInputValue('steamid')
+        .trim();
 
-        const className =
-            interaction.fields
-                .getTextInputValue('className')
-                .trim();
+    const className =
+        interaction.fields
+            .getTextInputValue('className')
+            .trim();
 
-        const code =
-            interaction.fields
-                .getTextInputValue('code')
-                .trim();
+    const daysString =
+        interaction.fields
+            .getTextInputValue('days')
+            .trim();
 
-        const srokString =
-            interaction.fields
-                .getTextInputValue('srok')
-                .trim();
-
-        if (!isValidSteamId(steamid)) {
-            return void interaction.reply({
-                content:
-                    '❌ SteamID64 должен состоять ровно из 17 цифр.',
-                ephemeral: true,
-            });
-        }
-
-        if (!isValidItemSide(code)) {
-            return void interaction.reply({
-                content:
-                    '❌ Некорректная сторона.\n\n' +
-                    'Разрешено:\n' +
-                    '`independent` — зелёные\n' +
-                    '`blufor` — синие\n' +
-                    '`Opfor` — красные\n' +
-                    '`true` — все',
-                ephemeral: true,
-            });
-        }
-
-        const srok =
-            parseExpirationDate(srokString);
-
-        if (!srok) {
-            return void interaction.reply({
-                content:
-                    '❌ Некорректная дата.\n\n' +
-                    'Используйте формат:\n' +
-                    '`2026-12-31 23:59:59`',
-                ephemeral: true,
-            });
-        }
-
-        await interaction.deferReply({
+    if (!isValidSteamId(steamid)) {
+        return void interaction.reply({
+            content:
+                '❌ SteamID64 должен состоять ровно из 17 цифр.',
             ephemeral: true,
         });
+    }
 
-        const result =
-            await addPlayerItem({
-                steamid,
-                className,
-                code,
-                srok,
-            });
+    const days =
+        Number(daysString);
 
-        if (!result.success) {
-            return void interaction.editReply({
-                content:
-                    `❌ ${result.message}`,
-            });
-        }
-
-        const playerName =
-            result.playerName ?? 'Неизвестный игрок';
-
-        await sendAdminLog({
-            title: '🎒 Выдан донатный item',
-            description:
-                `Администратор добавил игроку новый донатный предмет.`,
-            color: '#57F287',
-            fields: [
-                {
-                    name: '👤 Игрок',
-                    value:
-                        `${playerName}\n\`${steamid}\``,
-                    inline: true,
-                },
-                {
-                    name: '📦 ClassName',
-                    value:
-                        `\`${className}\``,
-                    inline: true,
-                },
-                {
-                    name: '🛡️ Сторона',
-                    value:
-                        getItemSideName(code),
-                    inline: true,
-                },
-                {
-                    name: '⏳ Срок',
-                    value:
-                        `\`${formatDate(srok)}\``,
-                    inline: true,
-                },
-            ],
-            executorId: interaction.user.id,
-        });
-
-        return void interaction.editReply({
+    if (
+        !Number.isInteger(days) ||
+        days <= 0 ||
+        days > 3650
+    ) {
+        return void interaction.reply({
             content:
-                `✅ **Item успешно добавлен.**\n\n` +
-                `👤 Игрок: **${playerName}**\n` +
-                `🎒 ClassName: \`${className}\`\n` +
-                `🛡️ Сторона: ${getItemSideName(code)}\n` +
-                `⏳ Срок: \`${formatDate(srok)}\``,
+                '❌ Срок должен быть целым числом от **1 до 3650 дней**.',
+            ephemeral: true,
         });
+    }
+
+    const player =
+        await findPlayer({
+            steamId: steamid,
+        });
+
+    if (!player) {
+        return void interaction.reply({
+            content:
+                `❌ Игрок с SteamID \`${steamid}\` не найден в базе.`,
+            ephemeral: true,
+        });
+    }
+
+    const token =
+        createPendingItem({
+            steamid,
+            className,
+            days,
+            userId: interaction.user.id,
+        });
+
+    const sideSelect =
+        new StringSelectMenuBuilder()
+            .setCustomId(
+                `items_add_side:${token}`
+            )
+            .setPlaceholder(
+                'Выберите сторону'
+            )
+            .addOptions(
+                {
+                    label: 'Зелёные',
+                    description:
+                        'Independent — зелёная сторона',
+                    value: 'independent',
+                    emoji: '🟢',
+                },
+                {
+                    label: 'Синие',
+                    description:
+                        'BLUFOR — синяя сторона',
+                    value: 'blufor',
+                    emoji: '🔵',
+                },
+                {
+                    label: 'Красные',
+                    description:
+                        'OPFOR — красная сторона',
+                    value: 'Opfor',
+                    emoji: '🔴',
+                },
+                {
+                    label: 'Все стороны',
+                    description:
+                        'Предмет доступен всем сторонам',
+                    value: 'true',
+                    emoji: '⚪',
+                }
+            );
+
+    const row =
+        new ActionRowBuilder<StringSelectMenuBuilder>()
+            .addComponents(sideSelect);
+
+    const expiration =
+        new Date();
+
+    expiration.setDate(
+        expiration.getDate() + days
+    );
+
+    const embed =
+        new EmbedBuilder()
+            .setTitle('🛡️ ВЫБОР СТОРОНЫ')
+            .setDescription(
+                `Игрок: **${player.pName}**\n` +
+                `SteamID: \`${steamid}\`\n\n` +
+                `ClassName: \`${className}\`\n` +
+                `Срок: **${days} дн.**\n` +
+                `Истекает: **${formatDate(expiration)}**\n\n` +
+                `Выберите сторону, которой будет доступен предмет.`
+            )
+            .setColor('#5865F2');
+
+    return void interaction.reply({
+        embeds: [embed],
+        components: [row],
+        ephemeral: true,
+    });
     }
 
     if (
@@ -641,13 +714,20 @@ const handler: EventHandler<'interactionCreate'> =
             });
         }
 
-        const itemId =
-            Number(interaction.values[0]);
+        const value = interaction.values[0];
+
+        if (!value) {
+            return void interaction.reply({
+                content: '❌ Item не выбран.',
+                ephemeral: true,
+            });
+        }
+
+        const itemId = Number(value);
 
         if (!Number.isInteger(itemId)) {
             return void interaction.reply({
-                content:
-                    '❌ Некорректный ID item.',
+                content: '❌ Некорректный ID item.',
                 ephemeral: true,
             });
         }
@@ -656,6 +736,336 @@ const handler: EventHandler<'interactionCreate'> =
             interaction,
             itemId
         );
+    }
+
+    if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId.startsWith(
+            'items_add_side:'
+        )
+    ) {
+        if (!await hasItemsAccess(interaction)) {
+            return void interaction.reply({
+                content:
+                    '❌ У вас нет роли для управления донатными Items.',
+                ephemeral: true,
+            });
+        }
+
+        const token = interaction.customId.split(':')[1];
+
+        if (!token) {
+            return void interaction.reply({
+                content: '❌ Некорректная сессия добавления.',
+                ephemeral: true,
+            });
+        }
+
+        const pending = getPendingItem(
+            token,
+            interaction.user.id
+        );
+
+        if (!pending) {
+            return void interaction.reply({
+                content:
+                    '❌ Сессия добавления истекла. Начните добавление заново.',
+                ephemeral: true,
+            });
+        }
+
+        const code = interaction.values[0];
+
+        if (!code) {
+            return void interaction.reply({
+                content: '❌ Сторона не выбрана.',
+                ephemeral: true,
+            });
+        }
+
+        if (!isValidItemSide(code)) {
+            return void interaction.reply({
+                content: '❌ Некорректная сторона.',
+                ephemeral: true,
+            });
+        }
+
+        await interaction.deferUpdate();
+
+        const result =
+            await addPlayerItem({
+                steamid:
+                    pending.steamid,
+
+                className:
+                    pending.className,
+
+                code,
+
+                days:
+                    pending.days,
+            });
+
+        pendingItems.delete(token);
+
+        if (
+            !result.success ||
+            !result.item
+        ) {
+            return void interaction.editReply({
+                embeds: [],
+                components: [],
+                content:
+                    `❌ ${result.message ?? 'Не удалось создать item.'}`,
+            });
+        }
+
+        await sendAdminLog({
+            title:
+                '➕ Добавлен донатный item',
+
+            description:
+                'Администратор добавил новый донатный предмет игроку.',
+
+            color:
+                '#57F287',
+
+            fields: [
+                {
+                    name: '👤 Игрок',
+                    value:
+                        `${result.playerName ?? 'Неизвестный игрок'}\n\`${result.item.steamid}\``,
+                    inline: true,
+                },
+                {
+                    name: '📦 ClassName',
+                    value:
+                        `\`${result.item.className}\``,
+                    inline: true,
+                },
+                {
+                    name: '🛡️ Сторона',
+                    value:
+                        getItemSideName(
+                            result.item.code
+                        ),
+                    inline: true,
+                },
+                {
+                    name: '⏳ Срок',
+                    value:
+                        `\`${formatDate(result.item.srok)}\``,
+                    inline: true,
+                },
+            ],
+
+            executorId:
+                interaction.user.id,
+        });
+
+        return void interaction.editReply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(
+                        '✅ ITEM ДОБАВЛЕН'
+                    )
+                    .setDescription(
+                        `Донатный предмет успешно добавлен игроку **${escapeMarkdown(result.playerName ?? 'Неизвестный игрок')}**.`
+                    )
+                    .setColor('#57F287')
+                    .addFields(
+                        {
+                            name: '📦 ClassName',
+                            value:
+                                `\`${escapeMarkdown(result.item.className)}\``,
+                            inline: true,
+                        },
+                        {
+                            name: '🛡️ Сторона',
+                            value:
+                                getItemSideName(
+                                    result.item.code
+                                ),
+                            inline: true,
+                        },
+                        {
+                            name: '⏳ Истекает',
+                            value:
+                                `\`${formatDate(result.item.srok)}\``,
+                            inline: true,
+                        }
+                    )
+                    .setTimestamp(),
+            ],
+            components: [],
+            content: '',
+        });
+    }
+
+    if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId.startsWith(
+            'items_edit_side:'
+        )
+    ) {
+        if (!await hasItemsAccess(interaction)) {
+            return void interaction.reply({
+                content:
+                    '❌ У вас нет роли для управления донатными Items.',
+                ephemeral: true,
+            });
+        }
+
+        const token = interaction.customId.split(':')[1];
+
+        if (!token) {
+            return void interaction.reply({
+                content: '❌ Некорректная сессия редактирования.',
+                ephemeral: true,
+            });
+        }
+
+        const pending = getPendingEditItem(
+            token,
+            interaction.user.id
+        );
+
+        if (!pending) {
+            return void interaction.reply({
+                content:
+                    '❌ Сессия редактирования истекла. Начните редактирование заново.',
+                ephemeral: true,
+            });
+        }
+
+        const code = interaction.values[0];
+
+        if (!code) {
+            return void interaction.reply({
+                content: '❌ Сторона не выбрана.',
+                ephemeral: true,
+            });
+        }
+
+        if (!isValidItemSide(code)) {
+            return void interaction.reply({
+                content: '❌ Некорректная сторона.',
+                ephemeral: true,
+            });
+        }
+
+        await interaction.deferUpdate();
+
+        const result =
+            await editPlayerItem(
+                pending.itemId,
+                {
+                    className:
+                        pending.className,
+                    code,
+                    days:
+                        pending.days,
+                }
+            );
+
+        pendingEditItems.delete(token);
+
+        if (
+            !result.success ||
+            !result.item ||
+            !result.oldItem
+        ) {
+            return void interaction.editReply({
+                embeds: [],
+                components: [],
+                content:
+                    `❌ ${result.message ?? 'Ошибка изменения item.'}`,
+            });
+        }
+
+        const playerName =
+            await getPlayerName(
+                result.item.steamid
+            );
+
+        await sendAdminLog({
+            title:
+                '✏️ Изменён донатный item',
+
+            description:
+                'Администратор изменил донатный предмет игрока.',
+
+            color:
+                '#FEE75C',
+
+            fields: [
+                {
+                    name: '👤 Игрок',
+                    value:
+                        `${playerName}\n\`${result.item.steamid}\``,
+                    inline: true,
+                },
+                {
+                    name: '📦 ClassName',
+                    value:
+                        `\`${result.oldItem.className}\` → \`${result.item.className}\``,
+                    inline: false,
+                },
+                {
+                    name: '🛡️ Сторона',
+                    value:
+                        `${getItemSideName(result.oldItem.code)} → ${getItemSideName(result.item.code)}`,
+                    inline: false,
+                },
+                {
+                    name: '⏳ Срок',
+                    value:
+                        `\`${formatDate(result.oldItem.srok)}\` → \`${formatDate(result.item.srok)}\``,
+                    inline: false,
+                },
+            ],
+
+            executorId:
+                interaction.user.id,
+        });
+
+        return void interaction.editReply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(
+                        '✅ ITEM ИЗМЕНЁН'
+                    )
+                    .setDescription(
+                        `Предмет игрока **${escapeMarkdown(playerName)}** успешно изменён.`
+                    )
+                    .setColor('#57F287')
+                    .addFields(
+                        {
+                            name: '📦 ClassName',
+                            value:
+                                `\`${escapeMarkdown(result.item.className)}\``,
+                            inline: true,
+                        },
+                        {
+                            name: '🛡️ Сторона',
+                            value:
+                                getItemSideName(
+                                    result.item.code
+                                ),
+                            inline: true,
+                        },
+                        {
+                            name: '⏳ Истекает',
+                            value:
+                                `\`${formatDate(result.item.srok)}\``,
+                            inline: true,
+                        }
+                    )
+                    .setTimestamp(),
+            ],
+            components: [],
+            content: '',
+        });
     }
 
     if (
@@ -700,7 +1110,6 @@ const handler: EventHandler<'interactionCreate'> =
             createEditItemModal({
                 id: item.id,
                 className: item.className,
-                code: item.code,
                 srok: item.srok,
             })
         );
@@ -738,110 +1147,125 @@ const handler: EventHandler<'interactionCreate'> =
                 .getTextInputValue('className')
                 .trim();
 
-        const code =
+        const daysString =
             interaction.fields
-                .getTextInputValue('code')
+                .getTextInputValue('days')
                 .trim();
 
-        const srokString =
-            interaction.fields
-                .getTextInputValue('srok')
-                .trim();
+        const days =
+            Number(daysString);
 
-        if (!isValidItemSide(code)) {
+        if (!className) {
             return void interaction.reply({
                 content:
-                    '❌ Некорректная сторона.\n\n' +
-                    '`independent` — зелёные\n' +
-                    '`blufor` — синие\n' +
-                    '`Opfor` — красные\n' +
-                    '`true` — все',
+                    '❌ ClassName не может быть пустым.',
                 ephemeral: true,
             });
         }
-
-        const srok =
-            parseExpirationDate(srokString);
-
-        if (!srok) {
-            return void interaction.reply({
-                content:
-                    '❌ Некорректная дата.\nИспользуйте `2026-12-31 23:59:59`.',
-                ephemeral: true,
-            });
-        }
-
-        await interaction.deferReply({
-            ephemeral: true,
-        });
-
-        const result =
-            await editPlayerItem(
-                itemId,
-                {
-                    className,
-                    code,
-                    srok,
-                }
-            );
 
         if (
-            !result.success ||
-            !result.item ||
-            !result.oldItem
+            !Number.isInteger(days) ||
+            days <= 0 ||
+            days > 3650
         ) {
-            return void interaction.editReply({
+            return void interaction.reply({
                 content:
-                    `❌ ${result.message ?? 'Ошибка изменения item.'}`,
+                    '❌ Срок должен быть целым числом от **1 до 3650 дней**.',
+                ephemeral: true,
             });
         }
+
+        const item =
+            await getPlayerItem(itemId);
+
+        if (!item) {
+            return void interaction.reply({
+                content:
+                    '❌ Этот item больше не существует.',
+                ephemeral: true,
+            });
+        }
+
+        const token =
+            createPendingEditItem({
+                itemId,
+                className,
+                days,
+                userId: interaction.user.id,
+            });
+
+        const sideSelect =
+            new StringSelectMenuBuilder()
+                .setCustomId(
+                    `items_edit_side:${token}`
+                )
+                .setPlaceholder(
+                    'Выберите сторону'
+                )
+                .addOptions(
+                    {
+                        label: 'Зелёные',
+                        description:
+                            'Предмет доступен зелёной стороне',
+                        value: 'independent',
+                        emoji: '🟢',
+                    },
+                    {
+                        label: 'Синие',
+                        description:
+                            'Предмет доступен синей стороне',
+                        value: 'blufor',
+                        emoji: '🔵',
+                    },
+                    {
+                        label: 'Красные',
+                        description:
+                            'Предмет доступен красной стороне',
+                        value: 'Opfor',
+                        emoji: '🔴',
+                    },
+                    {
+                        label: 'Все стороны',
+                        description:
+                            'Предмет доступен всем сторонам',
+                        value: 'true',
+                        emoji: '⚪',
+                    }
+                );
+
+        const row =
+            new ActionRowBuilder<StringSelectMenuBuilder>()
+                .addComponents(sideSelect);
+
+        const expiration =
+            new Date();
+
+        expiration.setDate(
+            expiration.getDate() + days
+        );
 
         const playerName =
             await getPlayerName(
-                result.item.steamid
+                item.steamid
             );
 
-        await sendAdminLog({
-            title: '✏️ Изменён донатный item',
-            description:
-                `Администратор изменил донатный предмет игрока.`,
-            color: '#FEE75C',
-            fields: [
-                {
-                    name: '👤 Игрок',
-                    value:
-                        `${playerName}\n\`${result.item.steamid}\``,
-                    inline: true,
-                },
-                {
-                    name: '📦 ClassName',
-                    value:
-                        `\`${result.oldItem.className}\` → \`${result.item.className}\``,
-                    inline: false,
-                },
-                {
-                    name: '🛡️ Сторона',
-                    value:
-                        `${getItemSideName(result.oldItem.code)} → ${getItemSideName(result.item.code)}`,
-                    inline: false,
-                },
-                {
-                    name: '⏳ Срок',
-                    value:
-                        `\`${formatDate(result.oldItem.srok)}\` → \`${formatDate(result.item.srok)}\``,
-                    inline: false,
-                },
-            ],
-            executorId: interaction.user.id,
-        });
+        const embed =
+            new EmbedBuilder()
+                .setTitle('✏️ РЕДАКТИРОВАНИЕ ITEM')
+                .setDescription(
+                    `**Игрок:** ${escapeMarkdown(playerName)}\n` +
+                    `**SteamID:** \`${item.steamid}\`\n\n` +
+                    `**ClassName:** \`${escapeMarkdown(className)}\`\n` +
+                    `**Срок:** ${days} дн.\n` +
+                    `**Истекает:** ${formatDate(expiration)}\n\n` +
+                    `Выберите новую сторону предмета.`
+                )
+                .setColor('#FEE75C');
 
-        return void interaction.editReply({
-            content:
-                `✅ **Item успешно изменён.**\n\n` +
-                `👤 Игрок: **${playerName}**\n` +
-                `📦 ClassName: \`${result.item.className}\`\n` +
-                `🛡️ Сторона: ${getItemSideName(result.item.code)}\n` +
-                `⏳ Срок: \`${formatDate(result.item.srok)}\``,
+        return void interaction.reply({
+            embeds: [embed],
+            components: [row],
+            ephemeral: true,
         });
     }
 

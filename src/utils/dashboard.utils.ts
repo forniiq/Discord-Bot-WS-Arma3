@@ -40,13 +40,13 @@ export function buildPlayerDashboard(player: PlayerInfo) {
             },
             { 
                 name: '📊 Статистика', 
-                value: `**Опыт:** ${player.pExp}\n**Карма:** ${player.pKarma}`, 
+                value: `**Опыт:** ${player.pExp}\n**Карма:** ${player.pKarma}\n**Буст опыта:** ${expBonus}`, 
                 inline: true 
             },
 
             ...(adminLevel > 0 ? [{
                 name: '🛡️ Администрация',
-                value: `**Уровень:** ${ADMIN_LEVELS[String(adminLevel)] ?? `Уровень ${adminLevel}`}\n**Буст опыта:** ${expBonus}`,
+                value: `**Уровень:** ${ADMIN_LEVELS[String(adminLevel)] ?? `Уровень ${adminLevel}`}`,
                 inline: false
             }] : []),
 

@@ -1,4 +1,4 @@
-import { sequelize } from '../connect';
+import { sequelize } from '@/database/connect';
 
 export interface ItemInfo {
     id: number;
@@ -9,89 +9,118 @@ export interface ItemInfo {
     srok: Date;
 }
 
-export async function getItemsBySteamId(
-    steamid: string
-): Promise<ItemInfo[]> {
-    const [rows] = await sequelize.query(
-        `
-        SELECT
-            id,
-            steamid,
-            className,
-            code,
-            insert_at,
-            srok
-        FROM items
-        WHERE steamid = :steamid
-        ORDER BY srok ASC, id ASC
-        `,
-        {
-            replacements: { steamid },
-        }
-    );
-
-    return rows as ItemInfo[];
-}
-
-export async function getItemById(
-    id: number
-): Promise<ItemInfo | null> {
-    const [rows] = await sequelize.query(
-        `
-        SELECT
-            id,
-            steamid,
-            className,
-            code,
-            insert_at,
-            srok
-        FROM items
-        WHERE id = :id
-        LIMIT 1
-        `,
-        {
-            replacements: { id },
-        }
-    );
-
-    return (rows as ItemInfo[])[0] ?? null;
-}
-
 export async function createItem(data: {
     steamid: string;
     className: string;
     code: string;
-    srok: Date;
+    days: number;
 }): Promise<ItemInfo | null> {
-    const [result] = await sequelize.query(
-        `
-        INSERT INTO items (
-            steamid,
-            className,
-            code,
-            insert_at,
-            srok
-        )
-        VALUES (
-            :steamid,
-            :className,
-            :code,
-            NOW(),
-            :srok
-        )
-        `,
-        {
-            replacements: data,
+    try {
+        const days = Math.trunc(data.days);
+
+        if (
+            !Number.isInteger(days) ||
+            days <= 0 ||
+            days > 3650
+        ) {
+            return null;
         }
-    );
 
-    const insertId = (result as any)?.insertId;
+        const [, metadata] =
+            await sequelize.query(
+                `
+                INSERT INTO items (
+                    steamid,
+                    className,
+                    code,
+                    insert_at,
+                    srok
+                )
+                VALUES (
+                    :steamid,
+                    :className,
+                    :code,
+                    NOW(),
+                    DATE_ADD(
+                        NOW(),
+                        INTERVAL ${days} DAY
+                    )
+                )
+                `,
+                {
+                    replacements: {
+                        steamid: data.steamid,
+                        className: data.className,
+                        code: data.code,
+                    },
+                }
+            );
 
-    if (!insertId) {
+        const insertId =
+            Number(
+                (metadata as any)?.insertId
+            );
+
+        if (!insertId) {
+            console.error(
+                'INSERT выполнен, но insertId не получен:',
+                metadata
+            );
+
+            return null;
+        }
+
+        return findItemById(insertId);
+    } catch (error) {
+        console.error(
+            'Ошибка создания item:',
+            error
+        );
+
         return null;
     }
+}
 
-    return getItemById(Number(insertId));
+export async function findItemById(
+    id: number
+): Promise<ItemInfo | null> {
+    const [rows] =
+        await sequelize.query(
+            `
+            SELECT *
+            FROM items
+            WHERE id = :id
+            LIMIT 1
+            `,
+            {
+                replacements: { id },
+            }
+        );
+
+    return (
+        (rows as ItemInfo[])[0] ??
+        null
+    );
+}
+
+export async function findItemsBySteamId(
+    steamid: string
+): Promise<ItemInfo[]> {
+    const [rows] =
+        await sequelize.query(
+            `
+            SELECT *
+            FROM items
+            WHERE steamid = :steamid
+              AND srok > NOW()
+            ORDER BY srok ASC
+            `,
+            {
+                replacements: { steamid },
+            }
+        );
+
+    return rows as ItemInfo[];
 }
 
 export async function updateItem(
@@ -99,31 +128,50 @@ export async function updateItem(
     data: {
         className: string;
         code: string;
-        srok: Date;
+        days: number;
     }
-): Promise<boolean> {
+): Promise<ItemInfo | null> {
     try {
-        const [, metadata] = await sequelize.query(
+        const days = Math.trunc(data.days);
+
+        if (
+            !Number.isInteger(days) ||
+            days <= 0 ||
+            days > 3650
+        ) {
+            return null;
+        }
+
+        await sequelize.query(
             `
             UPDATE items
             SET
                 className = :className,
                 code = :code,
-                srok = :srok
+                srok = DATE_ADD(
+                    NOW(),
+                    INTERVAL ${days} DAY
+                )
             WHERE id = :id
             `,
             {
                 replacements: {
                     id,
-                    ...data,
+                    className:
+                        data.className,
+                    code: data.code,
                 },
             }
         );
 
-        return Number((metadata as any)?.affectedRows ?? 0) > 0;
+        return findItemById(id);
     } catch (error) {
-        console.error('Ошибка при обновлении item:', error);
-        return false;
+        console.error(
+            'Ошибка изменения item:',
+            error
+        );
+
+        return null;
     }
 }
 
@@ -131,35 +179,49 @@ export async function deleteItem(
     id: number
 ): Promise<boolean> {
     try {
-        const [, metadata] = await sequelize.query(
-            `
-            DELETE FROM items
-            WHERE id = :id
-            `,
-            {
-                replacements: { id },
-            }
+        const [, metadata] =
+            await sequelize.query(
+                `
+                DELETE FROM items
+                WHERE id = :id
+                `,
+                {
+                    replacements: { id },
+                }
+            );
+
+        return Number(
+            (metadata as any)?.affectedRows
+        ) > 0;
+    } catch (error) {
+        console.error(
+            'Ошибка удаления item:',
+            error
         );
 
-        return Number((metadata as any)?.affectedRows ?? 0) > 0;
-    } catch (error) {
-        console.error('Ошибка при удалении item:', error);
         return false;
     }
 }
 
 export async function deleteExpiredItems(): Promise<number> {
     try {
-        const [, metadata] = await sequelize.query(
-            `
-            DELETE FROM items
-            WHERE srok <= NOW()
-            `
+        const [, metadata] =
+            await sequelize.query(
+                `
+                DELETE FROM items
+                WHERE srok <= NOW()
+                `
+            );
+
+        return Number(
+            (metadata as any)?.affectedRows ?? 0
+        );
+    } catch (error) {
+        console.error(
+            'Ошибка удаления истёкших items:',
+            error
         );
 
-        return Number((metadata as any)?.affectedRows ?? 0);
-    } catch (error) {
-        console.error('Ошибка при удалении истёкших items:', error);
         return 0;
     }
 }
