@@ -597,29 +597,25 @@ const handler: EventHandler<'interactionCreate'> =
             .addOptions(
                 {
                     label: 'Зелёные',
-                    description:
-                        'Independent — зелёная сторона',
-                    value: 'independent',
+                    description: 'Independent — зелёная сторона',
+                    value: 'call isIndependent',
                     emoji: '🟢',
                 },
                 {
                     label: 'Синие',
-                    description:
-                        'BLUFOR — синяя сторона',
-                    value: 'blufor',
+                    description: 'BLUFOR — синяя сторона',
+                    value: 'call isBlufor',
                     emoji: '🔵',
                 },
                 {
                     label: 'Красные',
-                    description:
-                        'OPFOR — красная сторона',
-                    value: 'Opfor',
+                    description: 'OPFOR — красная сторона',
+                    value: 'call isOpfor',
                     emoji: '🔴',
                 },
                 {
                     label: 'Все стороны',
-                    description:
-                        'Предмет доступен всем сторонам',
+                    description: 'Предмет доступен всем сторонам',
                     value: 'true',
                     emoji: '⚪',
                 }

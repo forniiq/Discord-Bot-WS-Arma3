@@ -10,15 +10,15 @@ import {
 import { findPlayer } from '@/database/queries/players.queries';
 
 export type ItemSide =
-    | 'independent'
-    | 'blufor'
-    | 'Opfor'
+    | 'call isIndependent'
+    | 'call isBlufor'
+    | 'call isOpfor'
     | 'true';
 
 export const ITEM_SIDES = [
-    'independent',
-    'blufor',
-    'Opfor',
+    'call isIndependent',
+    'call isBlufor',
+    'call isOpfor',
     'true',
 ] as const;
 
@@ -34,13 +34,13 @@ export function getItemSideName(
     code: string
 ): string {
     switch (code) {
-        case 'independent':
+        case 'call isIndependent':
             return '🟢 Зелёные';
 
-        case 'blufor':
+        case 'call isBlufor':
             return '🔵 Синие';
 
-        case 'Opfor':
+        case 'call isOpfor':
             return '🔴 Красные';
 
         case 'true':
