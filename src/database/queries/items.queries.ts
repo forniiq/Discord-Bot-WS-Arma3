@@ -26,51 +26,54 @@ export async function createItem(data: {
             return null;
         }
 
-        const [, metadata] =
-            await sequelize.query(
-                `
-                INSERT INTO items (
-                    steamid,
-                    className,
-                    code,
-                    insert_at,
-                    srok
-                )
-                VALUES (
-                    :steamid,
-                    :className,
-                    :code,
+        await sequelize.query(
+            `
+            INSERT INTO items (
+                steamid,
+                className,
+                code,
+                insert_at,
+                srok
+            )
+            VALUES (
+                :steamid,
+                :className,
+                :code,
+                NOW(),
+                DATE_ADD(
                     NOW(),
-                    DATE_ADD(
-                        NOW(),
-                        INTERVAL ${days} DAY
-                    )
+                    INTERVAL ${days} DAY
                 )
-                `,
-                {
-                    replacements: {
-                        steamid: data.steamid,
-                        className: data.className,
-                        code: data.code,
-                    },
-                }
-            );
+            )
+            `,
+            {
+                replacements: {
+                    steamid: data.steamid,
+                    className: data.className,
+                    code: data.code,
+                },
+            }
+        );
+
+        const [rows] = await sequelize.query(
+            `SELECT LAST_INSERT_ID() AS id`
+        );
 
         const insertId =
             Number(
-                (metadata as any)?.insertId
+                (rows as { id: number }[])[0]?.id
             );
 
         if (!insertId) {
             console.error(
-                'INSERT выполнен, но insertId не получен:',
-                metadata
+                'INSERT выполнен, но ID созданной записи не получен.'
             );
 
             return null;
         }
 
         return findItemById(insertId);
+
     } catch (error) {
         console.error(
             'Ошибка создания item:',
