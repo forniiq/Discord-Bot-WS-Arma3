@@ -85,11 +85,15 @@ export async function getOnlineCount(): Promise<number> {
 
 export async function getOnlinePlayers(): Promise<OnlinePlayer[]> {
     const [rows] = await sequelize.query(`
-        SELECT p.pName, s.pLvl, s.pLvlSort, s.Slot
-        FROM stats o
-        INNER JOIN players p ON o.pUID = p.pUID
-        INNER JOIN stats s ON p.pName = s.pName
-        ORDER BY s.pLvlSort DESC, p.pName ASC
+        SELECT 
+            s.pName,
+            s.pLvl,
+            s.pLvlSort,
+            s.Slot
+        FROM stats s
+        INNER JOIN players p ON s.pUID = p.pUID
+        ORDER BY s.pLvlSort DESC, s.pName ASC
     `);
+
     return rows as OnlinePlayer[];
 }
