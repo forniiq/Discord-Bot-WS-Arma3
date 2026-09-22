@@ -91,7 +91,6 @@ export async function getOnlinePlayers(): Promise<OnlinePlayer[]> {
             s.pLvlSort,
             s.Slot
         FROM stats s
-        INNER JOIN players p ON s.pUID = p.pUID
         ORDER BY s.pLvlSort DESC, s.pName ASC
     `);
 
