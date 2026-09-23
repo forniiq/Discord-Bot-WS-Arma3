@@ -26,6 +26,16 @@ export interface OnlinePlayer {
     Slot: string;
 }
 
+export interface ActivityPlayer {
+    ID: number;
+    pName: string;
+    pLastTime: string | null;
+    pUnits: string;
+    DiscID: string | null;
+}
+
+export type ActivitySort = 'newest' | 'oldest';
+
 export async function findPlayer(search: {
     steamId?: string;
     nickname?: string;
@@ -95,4 +105,35 @@ export async function getOnlinePlayers(): Promise<OnlinePlayer[]> {
     `);
 
     return rows as OnlinePlayer[];
+}
+
+export async function getUnitActivity(
+    pUnits: string,
+    sort: ActivitySort = 'newest'
+): Promise<ActivityPlayer[]> {
+    const orderBy = sort === 'newest'
+        ? 'pLastTime DESC'
+        : 'pLastTime ASC';
+
+    const [rows] = await sequelize.query(
+        `
+        SELECT
+            ID,
+            pName,
+            pLastTime,
+            pUnits,
+            DiscID
+        FROM players
+        WHERE pUnits = :pUnits
+        ORDER BY
+            pLastTime IS NULL ASC,
+            ${orderBy},
+            pName ASC
+        `,
+        {
+            replacements: { pUnits }
+        }
+    );
+
+    return rows as ActivityPlayer[];
 }
