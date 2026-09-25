@@ -4,7 +4,6 @@ import {
     DECREE_SUBJECTS,
 } from '@/config/decree-categories';
 import { RANKS } from '@/config/edit-сategories';
-import { SERVER_CONFIG } from '@/config/server.config';
 
 export interface DecreeSignature {
     title: string;
@@ -59,7 +58,6 @@ function formatDate(): string {
 
 export async function createDecreeData(params: {
     memberId: string;
-    memberRoleIds: string[];
 
     number: number;
     issuerValue: string;
@@ -73,7 +71,6 @@ export async function createDecreeData(params: {
 }): Promise<DecreeData> {
     const {
         memberId,
-        memberRoleIds,
         number,
         issuerValue,
         subjectValue,
@@ -91,20 +88,6 @@ export async function createDecreeData(params: {
 
     if (!issuer) {
         throw new Error('Неизвестный тип издателя приказа.');
-    }
-
-    // --------------------------------
-    // 2. Проверяем роль пользователя
-    // --------------------------------
-
-    if (
-        !memberRoleIds.includes(
-            SERVER_CONFIG.discord.roles.chiefAdmin
-        )
-    ) {
-        throw new Error(
-            'Создавать приказы может только Главный администратор.'
-        );
     }
 
     // --------------------------------

@@ -7,12 +7,12 @@ import {
     GuildMember,
     MessageFlags,
     ModalBuilder,
+    PermissionsBitField,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
     TextInputBuilder,
     TextInputStyle,
 } from 'discord.js';
-
 import {
     DECREE_ISSUERS,
     DECREE_SUBJECTS,
@@ -290,6 +290,26 @@ async function handleDecreeSubject(
 async function handleDecreePointsModal(
     interaction: any
 ) {
+    const member = await interaction.guild!.members.fetch(
+        interaction.user.id
+    );
+
+    if (
+        !member.permissions.has(
+            PermissionsBitField.Flags.Administrator
+        )
+    ) {
+        await interaction.reply({
+            content:
+                '❌ Создавать приказы могут только пользователи с правом **Администратор**.',
+            flags: MessageFlags.Ephemeral,
+        });
+
+        sessions.delete(interaction.user.id);
+
+        return;
+    }
+
     const session = sessions.get(interaction.user.id);
 
     if (!session) {
@@ -391,16 +411,6 @@ async function handleDecreePointsModal(
 
     try {
         // ====================================================
-        // Получаем роли пользователя
-        // ====================================================
-
-        const member = await interaction.guild!.members.fetch(
-            interaction.user.id
-        );
-
-        const memberRoleIds = [...member.roles.cache.keys()];
-
-        // ====================================================
         // Формируем DecreeData
         // ====================================================
 
@@ -410,7 +420,6 @@ async function handleDecreePointsModal(
 
         const decree = await createDecreeData({
             memberId: interaction.user.id,
-            memberRoleIds,
 
             number: session.number,
             issuerValue: session.issuerValue,
@@ -635,6 +644,18 @@ const handler: EventHandler<'interactionCreate'> =
             interaction.isButton() &&
             interaction.customId === 'btn_decree_create'
         ) {
+            if (
+                !interaction.memberPermissions?.has(
+                    PermissionsBitField.Flags.Administrator
+                )
+            ) {
+                return void await interaction.reply({
+                    content:
+                        '❌ Создавать приказы могут только пользователи с правом **Администратор**.',
+                    flags: MessageFlags.Ephemeral,
+                });
+            }
+
             return void await handleDecreeCreate(
                 interaction
             );
