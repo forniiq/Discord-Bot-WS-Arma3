@@ -24,7 +24,8 @@ export const UNITS: Record<string, string> = {
     "234224": "Авангард",
     "234001": "North Response Force",
     "234236": "Академия Тайфун",
-    "234111": "Безликие"
+    "234111": "Безликие",
+    "234432": "Ч.А.Й",
 };
 
 export const TOGGLE_CATEGORIES = {
