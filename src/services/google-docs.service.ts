@@ -1,17 +1,24 @@
 import { google } from 'googleapis';
 import { pdf } from 'pdf-to-img';
-import fs from 'node:fs/promises';
-import fsSync from 'node:fs';
 
 import { getGoogleAuth } from './google-auth.service';
 import type { DecreeData } from './decree.service';
 import type { AwardDecreeData } from './award.service';
+
+import sharp from 'sharp';
 
 const TEMPLATE_DOCUMENT_ID =
     '1ahYQctItLhTKKEHAug0CRbEwOdG7cAweTSOENDmMZOA';
 
 const AWARD_TEMPLATE_DOCUMENT_ID =
     '1Rdkf63F3manC_5aEoeV1BlLCZS3s7OjyT2wvvJv4pGw';
+
+const AWARD_MEDAL_SIZE = 270;
+
+const AWARD_MEDAL_POSITION = {
+    left: 1200,
+    top: 425,
+};
 
 export async function createDecreeDocument(
     data: DecreeData
@@ -43,12 +50,6 @@ export async function createDecreeDocument(
         });
 
         documentId = copiedFile.data.id ?? undefined;
-
-if (!documentId) {
-    throw new Error(
-        'Google Drive не вернул ID созданного документа.'
-    );
-}
 
         if (!documentId) {
             throw new Error(
@@ -244,7 +245,6 @@ export async function createAwardDecreeDocument(
     });
 
     let documentId: string | undefined;
-    let medalFileId: string | undefined;
 
     try {
         /*
@@ -267,48 +267,7 @@ export async function createAwardDecreeDocument(
         }
 
         /*
-         * 2. Загружаем изображение медали в Google Drive
-         */
-
-        const medalFile = await drive.files.create({
-            requestBody: {
-                name: `award-medal-${data.medal.value}.png`,
-                mimeType: 'image/png',
-            },
-
-            media: {
-                mimeType: 'image/png',
-                body: fsSync.createReadStream(data.medal.filePath),
-            },
-
-            fields: 'id',
-        });
-
-        medalFileId = medalFile.data.id ?? undefined;
-
-        if (!medalFileId) {
-            throw new Error(
-                'Google Drive не вернул ID изображения медали.'
-            );
-        }
-
-        /*
-         * 3. Разрешаем Google Docs получить изображение
-         */
-
-        await drive.permissions.create({
-            fileId: medalFileId,
-            requestBody: {
-                type: 'anyone',
-                role: 'reader',
-            },
-        });
-
-        const medalUrl =
-            `https://drive.google.com/uc?export=download&id=${medalFileId}`;
-
-        /*
-         * 4. Заменяем обычные placeholder'ы
+         * 2. Заменяем placeholder'ы
          */
 
         await docs.documents.batchUpdate({
@@ -332,6 +291,16 @@ export async function createAwardDecreeDocument(
                                 matchCase: true,
                             },
                             replaceText: data.date,
+                        },
+                    },
+
+                    {
+                        replaceAllText: {
+                            containsText: {
+                                text: '{{MEDAL_NAME}}',
+                                matchCase: true,
+                            },
+                            replaceText: data.medal.name,
                         },
                     },
 
@@ -395,84 +364,14 @@ export async function createAwardDecreeDocument(
                             replaceText: data.issuer.name,
                         },
                     },
-                ],
-            },
-        });
-
-        /*
-         * 5. Находим {{MEDAL}} в документе
-         */
-
-        const document = await docs.documents.get({
-            documentId,
-        });
-
-        let medalStartIndex: number | undefined;
-
-        for (const content of document.data.body?.content ?? []) {
-            const paragraph = content.paragraph;
-
-            if (!paragraph) {
-                continue;
-            }
-
-            for (const element of paragraph.elements ?? []) {
-                const textRun = element.textRun;
-
-                if (!textRun?.content) {
-                    continue;
-                }
-
-                const index = textRun.content.indexOf('{{MEDAL}}');
-
-                if (index !== -1 && element.startIndex !== undefined) {
-                    medalStartIndex =
-                        element.startIndex! + index;
-
-                    break;
-                }
-            }
-
-            if (medalStartIndex !== undefined) {
-                break;
-            }
-        }
-
-        if (medalStartIndex === undefined) {
-            throw new Error(
-                'Placeholder {{MEDAL}} не найден в шаблоне наградного приказа.'
-            );
-        }
-
-        /*
-         * 6. Удаляем {{MEDAL}} и вставляем изображение
-         */
-
-        await docs.documents.batchUpdate({
-            documentId,
-            requestBody: {
-                requests: [
-                    {
-                        deleteContentRange: {
-                            range: {
-                                startIndex: medalStartIndex,
-                                endIndex: medalStartIndex + '{{MEDAL}}'.length,
-                            },
-                        },
-                    },
 
                     {
-                        insertInlineImage: {
-                            location: {
-                                index: medalStartIndex,
+                        replaceAllText: {
+                            containsText: {
+                                text: '{{MEDAL}}',
+                                matchCase: true,
                             },
-                            uri: medalUrl,
-                            objectSize: {
-                                height: {
-                                    magnitude: 300,
-                                    unit: 'PT',
-                                },
-                            },
+                            replaceText: '',
                         },
                     },
                 ],
@@ -480,7 +379,7 @@ export async function createAwardDecreeDocument(
         });
 
         /*
-         * 7. Экспортируем Google Docs → PDF
+         * 3. Экспортируем Google Docs → PDF
          */
 
         const pdfResponse = await drive.files.export(
@@ -498,7 +397,7 @@ export async function createAwardDecreeDocument(
         );
 
         /*
-         * 8. PDF → PNG
+         * 4. PDF → PNG
          */
 
         const pdfDocument = await pdf(pdfBuffer, {
@@ -519,11 +418,20 @@ export async function createAwardDecreeDocument(
             );
         }
 
-        return pngPages[0]!;
+        /*
+         * 5. Накладываем медаль поверх готового PNG
+         */
+
+        const finalPng = await overlayMedal(
+            pngPages[0]!,
+            data.medal.filePath
+        );
+
+        return finalPng;
 
     } finally {
         /*
-         * 9. Удаляем временный Google Docs
+         * 6. Удаляем временный Google Docs
          */
 
         if (documentId) {
@@ -538,22 +446,28 @@ export async function createAwardDecreeDocument(
                 );
             }
         }
-
-        /*
-         * 10. Удаляем временную медаль из Google Drive
-         */
-
-        if (medalFileId) {
-            try {
-                await drive.files.delete({
-                    fileId: medalFileId,
-                });
-            } catch (error) {
-                console.error(
-                    'Не удалось удалить временное изображение медали:',
-                    error
-                );
-            }
-        }
     }
+}
+
+async function overlayMedal(
+    decreePng: Buffer,
+    medalPath: string
+): Promise<Buffer> {
+    const medal = await sharp(medalPath)
+        .resize({
+            width: AWARD_MEDAL_SIZE,
+        })
+        .png()
+        .toBuffer();
+
+    return sharp(decreePng)
+        .composite([
+            {
+                input: medal,
+                left: AWARD_MEDAL_POSITION.left,
+                top: AWARD_MEDAL_POSITION.top,
+            },
+        ])
+        .png()
+        .toBuffer();
 }

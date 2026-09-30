@@ -19,9 +19,24 @@ export const DECREE_ISSUERS: DecreeIssuer[] = [
         roleId: '1262857260762136626',
     },
     {
+        value: 'server',
+        label: 'Руководитель сервера WS',
+        roleId: '1517576757090455582',
+    },
+    {
         value: 'admin',
         label: 'Главный администратор',
         roleId: '1262342579513593912',
+    },
+    {
+        value: 'division',
+        label: 'Командир Дивизии',
+        roleId: '1473709422328025160',
+    },
+    {
+        value: 'chast',
+        label: 'Командир Части',
+        roleId: '1457115015671713961',
     },
     {
         value: 'chief_staff',
