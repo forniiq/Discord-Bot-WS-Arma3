@@ -1,15 +1,9 @@
-import { RANKS } from "@/config/edit-сategories";
+import { RANKS } from '@/config/edit-сategories';
 
 export function getRankByLevel(level: string): string {
     const index = Number(level);
 
     return RANKS[index] ?? 'Неизвестное звание';
-}
-
-export function cleanPlayerName(name: string): string {
-    return name
-        .replace(/^\[[^\]]+\]\s*/i, '')
-        .trim();
 }
 
 export function formatDecreeDate(): string {

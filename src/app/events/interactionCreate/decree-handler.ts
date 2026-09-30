@@ -38,6 +38,10 @@ import {
     SERVER_CONFIG,
 } from '@/config/server.config';
 
+import {
+    getIssuerMember,
+} from '@/services/issuer-cache.service';
+
 interface DecreeSession {
     number: number;
     pointsCount: number;
@@ -351,15 +355,7 @@ async function handleDecreePointsModal(
         return;
     }
 
-    const members =
-        await interaction.guild!.members.fetch();
-
-    const issuerMember = members.find(
-        (member: GuildMember) =>
-            member.roles.cache.has(
-                issuerConfig.roleId
-            )
-    );
+    const issuerMember = getIssuerMember(issuerConfig.roleId);
 
     if (!issuerMember) {
         await interaction.reply({

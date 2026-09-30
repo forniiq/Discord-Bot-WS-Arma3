@@ -1,7 +1,15 @@
+import path from "node:path";
+
 export interface DecreeIssuer {
     value: string;
     label: string;
     roleId: string;
+}
+
+export interface AwardMedal {
+    value: string;
+    label: string;
+    fileName: string;
 }
 
 export const DECREE_ISSUERS: DecreeIssuer[] = [
@@ -80,5 +88,65 @@ export const DECREE_SUBJECTS = [
     {
         value: 'appointment',
         label: 'О назначении',
+    },
+    {
+        value: 'removal',
+        label: 'О снятии'
+    }
+];
+
+export const AWARD_MEDALS: AwardMedal[] = [
+    {
+        value: 'combat',
+        label: '«За Боевые Отличия»',
+        fileName: 'combat.png'
+    },
+
+    {
+        value: 'btv',
+        label: '«За Верную Службу БТВ»',
+        fileName: 'btv.png'
+    },
+
+    {
+        value: 'vvs',
+        label: '«За Верную Службу ВВС»',
+        fileName: 'vvs.png'
+    },
+
+    {
+        value: 'vp',
+        label: '«За Верную Службу Военной Полиции»',
+        fileName: 'vp.png'
+    },
+
+    {
+        value: 'project',
+        label: '«За Заслуги Перед Проектом»',
+        fileName: 'project.png'
+    },
+
+    {
+        value: 'spec',
+        label: '«За Верную Службу Спец-Роте»',
+        fileName: 'spec.png'
+    },
+
+    {
+        value: 'mto',
+        label: '«За Заслуги в МТО»',
+        fileName: 'mto.png'
+    },
+
+    {
+        value: 'eaa',
+        label: '«За Отличия в Операциях ЕАА»',
+        fileName: 'eaa.png'
+    },
+
+    {
+        value: 'leg',
+        label: '«За Заслуги Перед Легионом»',
+        fileName: 'leg.png'
     },
 ];

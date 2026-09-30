@@ -1,4 +1,5 @@
 import { startBankAutoSync } from '@/services/bank.service';
+import { initializeIssuerCache } from '@/services/issuer-cache.service';
 import { startItemsExpirationJob } from '@/services/items-expiration.service';
 import { StartMonitorUpdater } from '@/services/monitor-updater.service';
 import { refreshUnitsCache } from '@/services/units.service';
@@ -9,14 +10,17 @@ import { Logger } from 'commandkit/logger';
 
 
 const handler: EventHandler<'clientReady'> = async (client: any) => {
-  Logger.info(`===== Logged in as ${client.user.username}! =====`);
+    Logger.info(`===== Logged in as ${client.user.username}! =====`);
 
-  initLogger(client);
-  StartMonitorUpdater(client);
-  startZbdChecker(client, false);
-  startBankAutoSync(client);
-  await refreshUnitsCache();
-  startItemsExpirationJob();
+    initLogger(client);
+    StartMonitorUpdater(client);
+    startZbdChecker(client, false);
+    startBankAutoSync(client);
+    await refreshUnitsCache();
+    startItemsExpirationJob();
+
+    const guild = client.guilds.cache.first();
+    await initializeIssuerCache(guild)
 };
 
 export default handler;
