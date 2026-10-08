@@ -73,7 +73,12 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             .setCustomId('btn_restart_pvp')
             .setLabel('Рестарт PvP')
             .setEmoji('⚔️')
-            .setStyle(ButtonStyle.Danger)
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId('btn_shutdown_pvp')
+            .setLabel('Выключить PvP')
+            .setEmoji('⛔️')
+            .setStyle(ButtonStyle.Danger),
     );
 
     try {

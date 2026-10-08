@@ -64,6 +64,42 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
+    if (interaction.customId === 'btn_shutdown_pvp') {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const confirmEmbed = new EmbedBuilder()
+            .setTitle('⚠️ ПОДТВЕРЖДЕНИЕ ВЫКЛЮЧЕНИЯ')
+            .setDescription(
+                'Вы действительно хотите **выключить PvP сервер**?'
+            )
+            .setColor('#ed4245');
+
+        const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId('confirm_shutdown_pvp')
+                .setLabel('Выключить PvP')
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('⛔️'),
+
+            new ButtonBuilder()
+                .setCustomId('cancel_restart')
+                .setLabel('Отмена')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('❌')
+        );
+
+        return void interaction.reply({
+            embeds: [confirmEmbed],
+            components: [confirmRow],
+            ephemeral: true
+        });
+    }
+
     // 2. Отмена
     if (interaction.customId === 'cancel_restart') {
         return void interaction.update({
@@ -245,6 +281,107 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         restartProcess.on('close', (code) => {
             console.log(
                 `[${serverName}] Батник завершился с кодом: ${code}`
+            );
+        });
+    }
+
+    if (interaction.customId === 'confirm_shutdown_pvp') {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true
+            });
+        }
+
+        const batPath = 'C:\\arma3server\\stopws.bat';
+
+        // Обновляем сообщение администратора
+        await interaction.update({
+            content: '⏳ **Выключается PvP сервер...**',
+            embeds: [],
+            components: []
+        });
+
+        const batDir = path.dirname(batPath);
+        const batFile = path.basename(batPath);
+
+        const cmdPath =
+            process.env.ComSpec ??
+            'C:\\Windows\\System32\\cmd.exe';
+
+        console.log(`[ArmaShutdown] CMD: ${cmdPath}`);
+        console.log(`[ArmaShutdown] CWD: ${batDir}`);
+        console.log(`[ArmaShutdown] BAT: ${batFile}`);
+
+        const shutdownProcess = spawn(
+            cmdPath,
+            ['/d', '/c', batFile],
+            {
+                cwd: batDir,
+                windowsHide: false
+            }
+        );
+
+        shutdownProcess.on('error', async (error) => {
+            console.error(
+                '[ArmaShutdown] Ошибка выключения PvP:',
+                error
+            );
+
+            await sendLog(
+                'ERROR',
+                'Arma3Shutdown',
+                `Ошибка запуска stopws.bat: ${error.message}`
+            );
+
+            await interaction.followUp({
+                content:
+                    `❌ **Не удалось выключить PvP сервер:**\n` +
+                    `\`${error.message}\``,
+                ephemeral: true
+            }).catch(() => null);
+        });
+
+        shutdownProcess.stdout?.on('data', (data) => {
+            console.log(
+                `[PvP Shutdown] ${data.toString()}`
+            );
+        });
+
+        shutdownProcess.stderr?.on('data', (data) => {
+            console.error(
+                `[PvP Shutdown] ${data.toString()}`
+            );
+        });
+
+        await sendAdminLog({
+            title: '⛔ Выключение сервера',
+
+            description:
+                `Администратор <@${interaction.user.id}> ` +
+                `запустил выключение **PvP** сервера.`,
+
+            color: '#ed4245',
+
+            executorId: interaction.user.id,
+
+            fields: [
+                {
+                    name: 'Сервер',
+                    value: 'PvP Altis',
+                    inline: true
+                },
+                {
+                    name: 'Файл',
+                    value: `\`${batPath}\``,
+                    inline: true
+                }
+            ]
+        });
+
+        shutdownProcess.on('close', (code) => {
+            console.log(
+                `[PvP Shutdown] Батник завершился с кодом: ${code}`
             );
         });
     }
