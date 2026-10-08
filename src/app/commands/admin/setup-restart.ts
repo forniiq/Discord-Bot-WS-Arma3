@@ -65,19 +65,14 @@ export const chatInput: ChatInputCommand = async (ctx) => {
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_restart_pve')
-            .setLabel('Рестарт PvE')
+            .setCustomId('btn_restart')
+            .setLabel('Рестарт Сервера')
             .setEmoji('🛡️')
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-            .setCustomId('btn_restart_pvp')
-            .setLabel('Рестарт PvP')
-            .setEmoji('⚔️')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId('btn_shutdown_pvp')
-            .setLabel('Выключить PvP')
-            .setEmoji('⛔️')
+            .setCustomId('btn_shutdown')
+            .setLabel('Выключить Сервер')
+            .setEmoji('🔥')
             .setStyle(ButtonStyle.Danger),
     );
 
