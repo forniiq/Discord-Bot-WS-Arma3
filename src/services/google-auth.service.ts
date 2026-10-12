@@ -1,3 +1,4 @@
+
 import { authenticate } from '@google-cloud/local-auth';
 import { google } from 'googleapis';
 import fs from 'node:fs/promises';
@@ -8,89 +9,77 @@ const SCOPES = [
     'https://www.googleapis.com/auth/documents',
 ];
 
-const CREDENTIALS_PATH = path.resolve(
-    process.cwd(),
-    'secrets/google-oauth.json'
+const SECRETS_DIR = path.resolve(process.cwd(), 'secrets');
+const CREDENTIALS_PATH = path.join(
+    SECRETS_DIR,
+    'google-oauth.json'
 );
-
-const TOKEN_PATH = path.resolve(
-    process.cwd(),
-    'secrets/google-token.json'
+const TOKEN_PATH = path.join(
+    SECRETS_DIR,
+    'google-token.json'
 );
 
 export async function getGoogleAuth() {
-    const credentialsFile = JSON.parse(
-        await fs.readFile(
-            CREDENTIALS_PATH,
-            'utf-8'
-        )
-    );
+    await fs.mkdir(SECRETS_DIR, { recursive: true });
 
-    const installed = credentialsFile.installed;
-
-    if (!installed) {
-        throw new Error(
-            'В google-oauth.json не найден объект installed.'
-        );
-    }
-
-    const clientId = installed.client_id;
-    const clientSecret = installed.client_secret;
-    const redirectUri = installed.redirect_uris?.[0];
-
-    if (
-        !clientId ||
-        !clientSecret ||
-        !redirectUri
-    ) {
-        throw new Error(
-            'Некорректный google-oauth.json.'
-        );
-    }
-
-    const auth = new google.auth.OAuth2(
-        clientId,
-        clientSecret,
-        redirectUri
-    );
-
-    /*
-     * Если токен уже существует —
-     * используем сохранённую авторизацию.
-     */
+    let auth: InstanceType<typeof google.auth.OAuth2>;
 
     try {
-        const token = await fs.readFile(
-            TOKEN_PATH,
-            'utf-8'
-        );
+        const tokenFile = await fs.readFile(TOKEN_PATH, 'utf8');
+        const credentials = JSON.parse(tokenFile);
 
-        auth.setCredentials(
-            JSON.parse(token)
-        );
+        const oauth = new google.auth.OAuth2();
+        oauth.setCredentials(credentials);
+
+        oauth.on('tokens', async tokens => {
+            const current = oauth.credentials;
+
+            await fs.writeFile(
+                TOKEN_PATH,
+                JSON.stringify(
+                    { ...current, ...tokens },
+                    null,
+                    2
+                ),
+                'utf8'
+            );
+        });
+
+        auth = oauth;
+
+        // Проверяем, что сохранённый токен работает.
+        await auth.getAccessToken();
 
         return auth;
     } catch {
-        /*
-         * Первый запуск.
-         * Открываем браузер для OAuth.
-         */
+        // Если токена нет или он недействителен,
+        // запускаем повторную авторизацию.
+    }
 
-        const newAuth = await authenticate({
-            scopes: SCOPES,
-            keyfilePath: CREDENTIALS_PATH,
-        });
+    const newAuth = await authenticate({
+        keyfilePath: CREDENTIALS_PATH,
+        scopes: SCOPES,
+    });
 
+    const credentials = newAuth.credentials;
+
+    await fs.writeFile(
+        TOKEN_PATH,
+        JSON.stringify(credentials, null, 2),
+        'utf8'
+    );
+
+    newAuth.on('tokens', async tokens => {
         await fs.writeFile(
             TOKEN_PATH,
             JSON.stringify(
-                newAuth.credentials,
+                { ...newAuth.credentials, ...tokens },
                 null,
                 2
             ),
-            'utf-8'
+            'utf8'
         );
+    });
 
-        return newAuth as any;
-    }
+    return newAuth;
 }

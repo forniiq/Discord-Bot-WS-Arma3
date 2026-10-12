@@ -13,10 +13,13 @@ const handler: EventHandler<'clientReady'> = async (client: any) => {
     Logger.info(`===== Logged in as ${client.user.username}! =====`);
 
     initLogger(client);
-    StartMonitorUpdater(client);
+
+    await refreshUnitsCache();
+
+    await StartMonitorUpdater(client);
+
     startZbdChecker(client, false);
     startBankAutoSync(client);
-    await refreshUnitsCache();
     startItemsExpirationJob();
 
     const guild = client.guilds.cache.first();

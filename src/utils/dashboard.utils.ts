@@ -4,10 +4,11 @@ import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder,
 import { PlayerInfo } from '@/database/queries';
 import {
     RANKS,
-    UNITS,
     TOGGLE_CATEGORIES,
     ADMIN_LEVELS
 } from '@/config/edit-сategories';
+
+import { UNITS } from '@/config/roles-сonfig';
 import { parseArmaArray } from './array-parser.utils';
 
 export function buildPlayerDashboard(player: PlayerInfo) {

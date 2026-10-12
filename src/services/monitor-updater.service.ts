@@ -4,7 +4,7 @@ import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger.utils";
 import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
 import { getCurrentInfo, InfoData } from "@/database/queries/monitoring.queries";
-import { getApprovedUnitsSet } from "@/config/units";
+import { getCanonicalUnitName } from "@/config/units";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
 import { SERVER_CONFIG } from '@/config/server.config';
 import { getMessageId, setMessageId } from '@/utils/message-state';
@@ -185,12 +185,7 @@ function getPlayerUnit(name: string): string | null {
         return null;
     }
 
-    const unit = match[1].trim();
-    const approvedUnits = getApprovedUnitsSet();
-
-    return approvedUnits.has(unit)
-        ? unit
-        : null;
+    return getCanonicalUnitName(match[1]);
 }
 
 // Агрегация отрядов

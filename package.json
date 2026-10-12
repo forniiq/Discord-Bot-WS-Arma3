@@ -1,7 +1,7 @@
 {
   "name": "Discord Bot WS Arma",
   "description": "A CommandKit project using TypeScript",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "type": "module",
   "private": true,
   "main": "dist/index.js",
@@ -20,9 +20,11 @@
     "@napi-rs/canvas": "^1.0.9",
     "commandkit": "^1.2.1",
     "discord.js": "^14.26.4",
+    "docxtemplater": "^3.71.0",
     "googleapis": "^182.0.0",
     "mysql2": "^3.22.5",
     "pdf-to-img": "^7.0.0",
+    "pizzip": "^3.3.0",
     "sequelize": "^6.37.8",
     "sharp": "^0.35.5"
   }

@@ -72,7 +72,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 .setCustomId('confirm_shutdown')
                 .setLabel('Выключить Сервер')
                 .setStyle(ButtonStyle.Danger)
-                .setEmoji('⛔️'),
+                .setEmoji('⚠️'),
 
             new ButtonBuilder()
                 .setCustomId('cancel_shutdown')

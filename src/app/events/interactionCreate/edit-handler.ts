@@ -13,11 +13,11 @@ import { buildPlayerDashboard } from '@/utils/dashboard.utils';
 import {
     TOGGLE_CATEGORIES,
     RANKS,
-    UNITS,
     PRESET_COLORS,
     ADMIN_LEVELS,
     ADMIN_PANEL_OPTIONS
 } from '@/config/edit-сategories';
+import { UNITS } from '@/config/roles-сonfig';
 import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
 import { sendLog } from '@/utils/logger.utils';
 import { syncPlayerProfile } from '@/services/player-sync.service';
