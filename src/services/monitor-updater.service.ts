@@ -4,10 +4,11 @@ import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger.utils";
 import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
 import { getCurrentInfo, InfoData } from "@/database/queries/monitoring.queries";
-import { getCanonicalUnitName } from "@/config/units";
+import { UNITS, ROLES_CONFIG } from "@/config/roles-сonfig";
 import { SLOT_ABBREVIATIONS } from "@/config/slots";
 import { SERVER_CONFIG } from '@/config/server.config';
 import { getMessageId, setMessageId } from '@/utils/message-state';
+import { getCanonicalUnitName } from "@/config/units";
 
 // Пик онлайна за день
 let peakOnlineToday = 0;
@@ -190,19 +191,25 @@ function getPlayerUnit(name: string): string | null {
 
 // Агрегация отрядов
 function getUnitStats(players: OnlinePlayer[]) {
-
     const units = new Map<string, number>();
 
     for (const player of players) {
+        const unitName = getPlayerUnit(player.pName);
 
-        const unit = getPlayerUnit(player.pName);
+        if (!unitName) continue;
 
-        if (!unit)
-            continue;
+        // Находим ID отряда по его названию
+        const unitId = Object.entries(UNITS)
+            .find(([, name]) => name === unitName)?.[0];
+
+        // Отображаем тег из БД вместо названия
+        const unitTag = unitId
+            ? ROLES_CONFIG.units[unitId]?.tag ?? unitName
+            : unitName;
 
         units.set(
-            unit,
-            (units.get(unit) || 0) + 1
+            unitTag,
+            (units.get(unitTag) || 0) + 1
         );
     }
 
