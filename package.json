@@ -1,14 +1,15 @@
 {
   "name": "Discord Bot WS Arma",
   "description": "A CommandKit project using TypeScript",
-  "version": "0.7.5",
+  "version": "0.8.0",
   "type": "module",
   "private": true,
   "main": "dist/index.js",
   "scripts": {
     "dev": "commandkit dev",
     "build": "commandkit build",
-    "start": "commandkit start"
+    "start": "commandkit start",
+    "google:token": "tsx src/generate-google-token.ts"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

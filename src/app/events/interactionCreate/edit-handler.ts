@@ -15,7 +15,9 @@ import {
     RANKS,
     PRESET_COLORS,
     ADMIN_LEVELS,
-    ADMIN_PANEL_OPTIONS
+    ADMIN_PANEL_OPTIONS,
+    TIME_CATEGORIES,
+    BOSS_CATEGORIES
 } from '@/config/edit-сategories';
 import { UNITS } from '@/config/roles-сonfig';
 import { parseArmaArray, selectedValuesToArmaArray } from '@/utils/array-parser.utils';
@@ -236,6 +238,69 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 components: [rowMenu, rowButton]
             });
         }
+
+        if (selectedCategory === "edit_time") {
+            const timeArray = parseArmaArray(player.pTime);
+
+            const timeMenu = new StringSelectMenuBuilder()
+                .setCustomId(`select_time_metric:${pUID}`)
+                .setPlaceholder("Выберите показатель времени");
+
+            TIME_CATEGORIES.forEach(({ label, index }) => {
+                const minutes = timeArray[index] ?? 0;
+                const hours = Math.floor(minutes / 60);
+                const remainingMinutes = minutes % 60;
+
+                timeMenu.addOptions({
+                    label,
+                    description: `Сейчас: ${hours} ч ${remainingMinutes} мин`,
+                    value: String(index),
+                });
+            });
+
+            return void await interaction.update({
+                content: `⏱️ **Редактирование времени игрока: ${player.pName}**\nВыберите показатель, который хотите изменить:`,
+                components: [
+                    new ActionRowBuilder<StringSelectMenuBuilder>()
+                        .addComponents(timeMenu)
+                ]
+            });
+        }
+
+        if (selectedCategory === 'edit_boss') {
+            const bossArray = parseArmaArray(player.pBoss);
+
+            const rows = BOSS_CATEGORIES.map(({ index, label, options }) => {
+                const currentValue = bossArray[index] ?? 0;
+
+                const menu = new StringSelectMenuBuilder()
+                    .setCustomId(`select_boss:${pUID}:${index}`)
+                    .setPlaceholder(label)
+                    .addOptions(
+                        options.map(option => ({
+                            label: option.label,
+                            value: String(option.value),
+                            default: option.value === currentValue,
+                        }))
+                    );
+
+                return new ActionRowBuilder<StringSelectMenuBuilder>()
+                    .addComponents(menu);
+            });
+
+            return void await interaction.update({
+                content:
+                    `👔 **Редактирование должностей: ${player.pName}**\n\n` +
+                    BOSS_CATEGORIES.map(({ index, label, options }) => {
+                        const value = bossArray[index] ?? 0;
+                        const selected = options.find(option => option.value === value);
+
+                        return `**${label}:** ${selected?.label ?? 'Не задано'}`;
+                    }).join('\n') +
+                    '\n\nВыберите новое значение в соответствующем списке:',
+                components: rows,
+            });
+        }
     }
 
     // 2. Сохранение Звания / Отряда
@@ -438,6 +503,170 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.update({ content: "✅ Допуски обновлены и роли синхронизированы!", ...dashboard });
     }
 
+    // Выбор показателя времени
+    if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId.startsWith("select_time_metric:")
+    ) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: "❌ У вас нет доступа к этому действию.",
+                ephemeral: true
+            });
+        }
+
+        const pUID = interaction.customId.split(":")[1];
+        const index = Number(interaction.values[0]);
+
+        if (!pUID) return;
+
+        const category = TIME_CATEGORIES.find(item => item.index === index);
+
+        if (!category) {
+            return void interaction.reply({
+                content: "❌ Неизвестный показатель времени.",
+                ephemeral: true
+            });
+        }
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const timeArray = parseArmaArray(player.pTime);
+        const currentMinutes = timeArray[index] ?? 0;
+
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_save_time:${pUID}:${index}`)
+            .setTitle(`Изменение: ${category.label}`);
+
+        const hoursInput = new TextInputBuilder()
+            .setCustomId("timeHours")
+            .setLabel("Количество часов")
+            .setValue(String(Math.floor(currentMinutes / 60)))
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const minutesInput = new TextInputBuilder()
+            .setCustomId("timeMinutes")
+            .setLabel("Дополнительные минуты (0–59)")
+            .setValue(String(currentMinutes % 60))
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>()
+                .addComponents(hoursInput),
+            new ActionRowBuilder<TextInputBuilder>()
+                .addComponents(minutesInput)
+        );
+
+        return void await interaction.showModal(modal);
+    }
+
+    if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId.startsWith('select_boss:')
+    ) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void await interaction.reply({
+                content: '❌ У вас нет доступа к этому действию.',
+                ephemeral: true,
+            });
+        }
+
+        const [, pUID, indexString] = interaction.customId.split(':');
+        const index = Number(indexString);
+
+        if (!pUID) return;
+
+        const category = BOSS_CATEGORIES.find(item => item.index === index);
+
+        if (!category) {
+            return void await interaction.reply({
+                content: '❌ Неизвестная категория должности.',
+                ephemeral: true,
+            });
+        }
+
+        const selectedValue = Number(interaction.values[0]);
+
+        const validOption = category.options.some(
+            option => option.value === selectedValue
+        );
+
+        if (!validOption) {
+            return void await interaction.reply({
+                content: '❌ Недопустимое значение должности.',
+                ephemeral: true,
+            });
+        }
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void await interaction.reply({
+                content: '❌ Игрок не найден в базе данных.',
+                ephemeral: true,
+            });
+        }
+
+        const bossArray = parseArmaArray(player.pBoss);
+
+        while (bossArray.length < 4) {
+            bossArray.push(0);
+        }
+
+        // Меняем только выбранный индекс, остальные должности сохраняются.
+        bossArray[index] = selectedValue;
+
+        const saved = await updatePlayerField(
+            pUID,
+            'pBoss',
+            JSON.stringify(bossArray)
+        );
+
+        if (!saved) {
+            return void await interaction.reply({
+                content: '❌ Не удалось сохранить должность.',
+                ephemeral: true,
+            });
+        }
+
+        const updatedPlayer = await findPlayer({ steamId: pUID });
+
+        if (!updatedPlayer) {
+            return void await interaction.reply({
+                content: '⚠️ Должность сохранена, но профиль не удалось загрузить.',
+                ephemeral: true,
+            });
+        }
+
+        const selectedLabel = category.options.find(
+            option => option.value === selectedValue
+        )?.label ?? 'Неизвестно';
+
+        await sendLog(
+            'INFO',
+            'AdminEdit',
+            `Администратор \`${interaction.user.tag}\` изменил должность ` +
+            `**${category.label}** игроку \`${updatedPlayer.pName}\` ` +
+            `на **${selectedLabel}** (pUID: ${pUID})`
+        );
+
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+
+        return void await interaction.update({
+            content: `✅ Должность **${category.label}** изменена на **${selectedLabel}**.`,
+            ...dashboard,
+        });
+    }
+
     // 4. Сохранение Модального Окна (Ручная смена никнейма, опыта, кармы)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_main:")) {
         if (!(await requireOperator(interaction.user.id))) {
@@ -469,6 +698,122 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         await interaction.deferUpdate();
         const dashboard = buildPlayerDashboard(updatedPlayer);
         return void await interaction.editReply({ content: "✅ Данные обновлены!", ...dashboard });
+    }
+
+    if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith("modal_save_time:")
+    ) {
+        if (!(await requireOperator(interaction.user.id))) {
+            return void interaction.reply({
+                content: "❌ У вас нет доступа к этому действию.",
+                ephemeral: true
+            });
+        }
+
+        const [, pUID, indexString] = interaction.customId.split(":");
+        const index = Number(indexString);
+
+        if (!pUID) return;
+
+        const category = TIME_CATEGORIES.find(item => item.index === index);
+
+        if (!category) {
+            return void interaction.reply({
+                content: "❌ Неизвестный показатель времени.",
+                ephemeral: true
+            });
+        }
+
+        const hoursText = interaction.fields
+            .getTextInputValue("timeHours").trim();
+
+        const minutesText = interaction.fields
+            .getTextInputValue("timeMinutes").trim();
+
+        // Разрешаем только целые неотрицательные числа
+        if (
+            !/^\d+$/.test(hoursText) ||
+            !/^\d+$/.test(minutesText)
+        ) {
+            return void interaction.reply({
+                content: "❌ Введите целое неотрицательное количество часов и минут.",
+                ephemeral: true
+            });
+        }
+
+        const hours = Number(hoursText);
+        const minutes = Number(minutesText);
+
+        if (
+            !Number.isSafeInteger(hours) ||
+            !Number.isSafeInteger(minutes) ||
+            minutes > 59 ||
+            hours > Math.floor((Number.MAX_SAFE_INTEGER - 59) / 60)
+        ) {
+            return void interaction.reply({
+                content: "❌ Некорректное значение времени.",
+                ephemeral: true
+            });
+        }
+
+        const totalMinutes = hours * 60 + minutes;
+
+        const player = await findPlayer({ steamId: pUID });
+
+        if (!player) {
+            return void interaction.reply({
+                content: "❌ Игрок не найден в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const timeArray = parseArmaArray(player.pTime);
+
+        // Гарантируем наличие всех шести показателей
+        while (timeArray.length < 6) {
+            timeArray.push(0);
+        }
+
+        // Меняем только выбранный показатель
+        timeArray[index] = totalMinutes;
+
+        const saved = await updatePlayerField(
+            pUID,
+            "pTime",
+            JSON.stringify(timeArray)
+        );
+
+        if (!saved) {
+            return void interaction.reply({
+                content: "❌ Не удалось сохранить время в базе данных.",
+                ephemeral: true
+            });
+        }
+
+        const updatedPlayer = await findPlayer({ steamId: pUID });
+
+        if (!updatedPlayer) {
+            return void interaction.reply({
+                content: "⚠️ Время сохранено, но не удалось повторно загрузить профиль.",
+                ephemeral: true
+            });
+        }
+
+        await sendLog(
+            "INFO",
+            "AdminEdit",
+            `Администратор \`${interaction.user.tag}\` изменил показатель **${category.label}** игроку \`${updatedPlayer.pName}\` на **${hours} ч ${minutes} мин** (pUID: ${pUID})`
+        );
+
+        const dashboard = buildPlayerDashboard(updatedPlayer);
+
+        await interaction.deferUpdate();
+
+        return void await interaction.editReply({
+            content: `✅ Показатель **${category.label}** обновлён: **${hours} ч ${minutes} мин**.`,
+            ...dashboard
+        });
     }
 
     // 5. Обработка выбора цвета из готового пресета (выпадающий список)
@@ -670,13 +1015,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         }
 
         const newExpBonus = Number(bonusText);
-
-        if (!Number.isFinite(newExpBonus) || newExpBonus < 0) {
-            return void interaction.reply({
-                content: "❌ Некорректный бонус к опыту. Введите число, например `0.3`, `1` или `1.2`.",
-                ephemeral: true
-            });
-        }
 
         if (!Number.isFinite(newExpBonus) || newExpBonus < 0) {
             return void interaction.reply({

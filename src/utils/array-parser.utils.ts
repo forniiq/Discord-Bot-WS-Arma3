@@ -29,3 +29,25 @@ export function selectedValuesToArmaArray(selectedIndexes: string[], totalLength
     }
     return JSON.stringify(result);
 }
+
+export function formatPlayerTime(
+    time: string | null | undefined
+): string[] {
+    const values = parseArmaArray(time);
+
+    return Array.from({ length: 6 }, (_, index) => {
+        const totalMinutes = values[index] ?? 0;
+
+        if (
+            !Number.isSafeInteger(totalMinutes) ||
+            totalMinutes < 0
+        ) {
+            return 'Некорректные данные';
+        }
+
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        return `${hours} ч ${minutes} мин`;
+    });
+}

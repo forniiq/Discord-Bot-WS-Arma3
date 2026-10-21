@@ -5,11 +5,13 @@ import { PlayerInfo } from '@/database/queries';
 import {
     RANKS,
     TOGGLE_CATEGORIES,
-    ADMIN_LEVELS
+    ADMIN_LEVELS,
+    BOSS_CATEGORIES
 } from '@/config/edit-сategories';
 
 import { UNITS } from '@/config/roles-сonfig';
 import { parseArmaArray } from './array-parser.utils';
+import { formatPlayerTime } from '@/utils/array-parser.utils';
 
 export function buildPlayerDashboard(player: PlayerInfo) {
     const rankName = RANKS[parseInt(player.pLvl, 10)] || `Уровень ${player.pLvl}`;
@@ -24,6 +26,15 @@ export function buildPlayerDashboard(player: PlayerInfo) {
     const adminArray = parseArmaArray(player.pAdmin);
     const adminLevel = adminArray[0] ?? 0;
     const expBonus = adminArray[3] ?? 0;
+    const playerTime = formatPlayerTime(player.pTime);
+    const bossArray = parseArmaArray(player.pBoss);
+
+    const bossDescription = BOSS_CATEGORIES.map(({ index, label, options }) => {
+        const value = bossArray[index] ?? 0;
+        const selected = options.find(option => option.value === value);
+
+        return `**${label}:** ${selected?.label ?? 'Не задано'}`;
+    }).join('\n');
 
     const embed = new EmbedBuilder()
         .setTitle(`👤 Профиль игрока: ${player.pName}`)
@@ -44,12 +55,30 @@ export function buildPlayerDashboard(player: PlayerInfo) {
                 value: `**Опыт:** ${player.pExp}\n**Карма:** ${player.pKarma}\n**Буст опыта:** ${expBonus}`, 
                 inline: true 
             },
+            {
+                name: '⏱️ Время на сервере',
+                value: [
+                    `**Общее время:** ${playerTime[0]}`,
+                    `**ВВС:** ${playerTime[1]}`,
+                    `**БТВ:** ${playerTime[2]}`,
+                    `**ВМФ:** ${playerTime[3]}`,
+                    `**Повстанец:** ${playerTime[4]}`,
+                    `**Медик:** ${playerTime[5]}`
+                ].join('\n'),
+                inline: false
+            },
 
             ...(adminLevel > 0 ? [{
                 name: '🛡️ Администрация',
                 value: `**Уровень:** ${ADMIN_LEVELS[String(adminLevel)] ?? `Уровень ${adminLevel}`}`,
                 inline: false
             }] : []),
+
+            {
+                name: '👔 Должности и руководство',
+                value: bossDescription,
+                inline: false,
+            },
 
             { 
                 name: '🏷️ Кастомный префикс', 
@@ -104,6 +133,18 @@ export function buildPlayerDashboard(player: PlayerInfo) {
                 description: 'Уровень администрации, ВП-панель и бонус к опыту',
                 value: 'admin',
                 emoji: '🛡️'
+            },
+            {
+                label: '⏱️ Время на сервере',
+                description: 'Изменить общее время и время по направлениям',
+                value: 'edit_time',
+                emoji: '⏱️'
+            },
+            {
+                label: '👔 Начальники',
+                description: 'Назначить должности в личном составе, ВВС, БТВ и РП',
+                value: 'edit_boss',
+                emoji: '👔'
             }
         );
 

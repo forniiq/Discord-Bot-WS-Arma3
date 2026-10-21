@@ -70,3 +70,54 @@ export const ADMIN_PANEL_OPTIONS: Record<string, string> = {
     "0": "Нет доступа к ВП-панели",
     "1": "Есть доступ к ВП-панели"
 };
+
+export const TIME_CATEGORIES = [
+    { label: "Общее время", index: 0 },
+    { label: "Время в ВВС", index: 1 },
+    { label: "Время в БТВ", index: 2 },
+    { label: "Время в ВМФ", index: 3 },
+    { label: "Время повстанцем", index: 4 },
+    { label: "Время медиком", index: 5 },
+] as const;
+
+export const BOSS_CATEGORIES = [
+    {
+        index: 0,
+        label: 'Начальник личного состава',
+        options: [
+            { label: 'Нет должности', value: 0 },
+            { label: 'Ротный', value: 1 },
+            { label: 'Зам. командира роты', value: 2 },
+            { label: 'Начальник штаба', value: 3 },
+            { label: 'Командир части', value: 4 },
+            { label: 'Командир дивизии', value: 5 },
+        ],
+    },
+    {
+        index: 1,
+        label: 'ВВС',
+        options: [
+            { label: 'Нет должности', value: 0 },
+            { label: 'Начальник ВВС', value: 1 },
+            { label: 'Заместитель начальника ВВС', value: 2 },
+        ],
+    },
+    {
+        index: 2,
+        label: 'БТВ',
+        options: [
+            { label: 'Нет должности', value: 0 },
+            { label: 'Начальник БТВ', value: 1 },
+            { label: 'Заместитель начальника БТВ', value: 2 },
+        ],
+    },
+    {
+        index: 3,
+        label: 'РП',
+        options: [
+            { label: 'Нет должности', value: 0 },
+            { label: 'Начальник РП', value: 1 },
+            { label: 'Заместитель начальника РП', value: 2 },
+        ],
+    },
+] as const;

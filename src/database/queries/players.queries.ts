@@ -17,6 +17,7 @@ export interface PlayerInfo {
     DiscID: string | null;
     pTitle: string;
     pAdmin: string;
+    pTime: string;
 }
 
 export interface OnlinePlayer {
