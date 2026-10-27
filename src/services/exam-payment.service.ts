@@ -137,7 +137,6 @@ export async function handleInstructorSelect(interaction: StringSelectMenuIntera
     const taxAmount = Math.floor(item.cost * (taxPercent / 100));
     const instructorReward = item.cost - taxAmount;
 
-    // Вызываем общую функцию транзакции из database/queries
     const res = await processExamTransaction(
         studentDiscId,
         instructorId,
@@ -158,7 +157,6 @@ export async function handleInstructorSelect(interaction: StringSelectMenuIntera
         });
     }
 
-    // Обновляем счетчик банка в Discord
     updateBankDisplay(client).catch(console.error);
 
     await interaction.update({ 
@@ -166,7 +164,6 @@ export async function handleInstructorSelect(interaction: StringSelectMenuIntera
         components: [] 
     });
 
-    // Уведомление в чат инструкторов
     if (INSTRUCTORS_CHAT_ID && res.instructorResult) {
         const instChannel = await client.channels.fetch(INSTRUCTORS_CHAT_ID).catch(() => null) as TextChannel;
         if (instChannel) {
@@ -197,7 +194,6 @@ export async function handleInstructorSelect(interaction: StringSelectMenuIntera
         }
     }
 
-    // Логирование операции
     if (LOGS_CHANNEL_ID && res.studentResult && res.instructorResult) {
         const logChannel = await client.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) as TextChannel;
         if (logChannel) {

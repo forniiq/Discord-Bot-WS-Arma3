@@ -3,7 +3,8 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder
+    EmbedBuilder,
+    MessageFlags
 } from 'discord.js';
 
 import { SERVER_CONFIG } from '@/config/server.config';
@@ -189,7 +190,7 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
     if (!isCommander) {
         return void interaction.reply({
             content: '❌ У вас нет доступа к просмотру активности отряда.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -201,7 +202,7 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         return void interaction.reply({
             content:
                 '❌ Ваш Discord-аккаунт не привязан к игровому профилю.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -211,7 +212,7 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         return void interaction.reply({
             content:
                 '❌ Ваш игровой персонаж не состоит ни в одном отряде.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -262,7 +263,7 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
     }
 
     await interaction.deferReply({
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
     });
 
     try {

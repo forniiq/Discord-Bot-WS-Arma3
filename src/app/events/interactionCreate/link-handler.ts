@@ -3,17 +3,16 @@ import {
     ModalBuilder, 
     TextInputBuilder, 
     TextInputStyle, 
-    ActionRowBuilder 
+    ActionRowBuilder, 
+    MessageFlags
 } from 'discord.js';
 import { findPlayer, updatePlayerField } from '@/database/queries';
 import { syncPlayerProfile } from '@/services/player-sync.service';
 import { sendLog } from '@/utils/logger.utils';
 import { SERVER_CONFIG } from '@/config/server.config';
 
-// ID роли "Привязан"
 const LINKED_ROLE_ID = SERVER_CONFIG.discord.roles.linked;
 
-// Вспомогательная функция для проверки валидности привязанного DiscID
 function isDiscIdLinked(discId: string | number | null | undefined): boolean {
     if (!discId) return false;
     const str = String(discId).trim();
@@ -23,14 +22,13 @@ function isDiscIdLinked(discId: string | number | null | undefined): boolean {
 const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     if (!interaction.guild) return;
 
-    // 1. Нажатие на кнопку "Привязать аккаунт"
     if (interaction.isButton() && interaction.customId === "btn_link_steam") {
         const existingPlayer = await findPlayer({ discordId: interaction.user.id });
         
         if (existingPlayer) {
             return void interaction.reply({
                 content: `⚠️ Ваш Discord уже привязан к игроку **${existingPlayer.pName}** (pUID: \`${existingPlayer.pUID}\`).\nЕсли это ошибка, обратитесь к администрации.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -51,7 +49,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.showModal(modal);
     }
 
-    // 2. Обработка ввода SteamID из Модального окна
     if (interaction.isModalSubmit() && interaction.customId === "modal_link_steam") {
         const inputSteamId = interaction.fields.getTextInputValue("steam_id").trim();
 
@@ -60,24 +57,22 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: `❌ Игрок с SteamID \`${inputSteamId}\` не найден в базе данных сервера. Убедитесь, что вы заходили на сервер.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
         if (isDiscIdLinked(player.DiscID) && String(player.DiscID) !== interaction.user.id) {
             return void interaction.reply({
                 content: `❌ Данный игровой аккаунт (**${player.pName}**) уже привязан к другому пользователю Discord!`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        // Обновление базы данных
         await updatePlayerField(player.pUID, 'pDiscord', 1);
         await updatePlayerField(player.pUID, 'DiscID', interaction.user.id);
 
-        // Выдача роли "Привязан"
         try {
             const member = await interaction.guild.members.fetch(interaction.user.id);
             if (member && LINKED_ROLE_ID) {
@@ -87,7 +82,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             console.error('Ошибка при выдаче роли "Привязан":', roleError);
         }
 
-        // Синхронизация всех остальных ролей и никнейма
         const updatedPlayer = await findPlayer({ steamId: inputSteamId });
         if (updatedPlayer) {
             await syncPlayerProfile(interaction.guild as any, updatedPlayer);
@@ -100,9 +94,8 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 3. Нажатие на кнопку "Синхронизировать роли"
     if (interaction.isButton() && interaction.customId === "btn_sync_roles") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const player = await findPlayer({ discordId: interaction.user.id });
 
@@ -121,7 +114,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
 
         }
 
-        // Синхронизация ролей и никнейма
         const { roleSuccess, nameSuccess } = await syncPlayerProfile(interaction.guild as any, player);
 
         await sendLog('INFO', 'Sync', `Пользователь \`${interaction.user.tag}\` запустил ручную синхронизацию ролей для **${player.pName}**.`);

@@ -1,11 +1,8 @@
-import type { ChatInputCommand, MessageCommand, CommandData, CommandMetadata } from 'commandkit';
-import {
-    SlashCommandBuilder,
-    PermissionFlagsBits,
-} from 'discord.js';
+import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { google } from 'googleapis';
 
-import { getGoogleAuth } from '../../../services/google-auth.service';
+import { getGoogleAuth } from '../../services/google-auth.service';
+import { MessageFlags } from 'discord.js';
 
 const TEMPLATE_DOCUMENT_ID =
     '1ahYQctItLhTKKEHAug0CRbEwOdG7cAweTSOENDmMZOA';
@@ -24,14 +21,12 @@ export const command: CommandData = {
 
 export const chatInput: ChatInputCommand = async (ctx) => {
     await ctx.interaction.deferReply({
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral
     });
 
     try {
-        // 1. Проверяем OAuth-авторизацию.
         const auth = await getGoogleAuth();
 
-        // 2. Создаём клиенты Google API.
         const drive = google.drive({
             version: 'v3',
             auth: auth as any,
@@ -42,7 +37,6 @@ export const chatInput: ChatInputCommand = async (ctx) => {
             auth: auth as any,
         });
 
-        // 3. Проверяем доступ к обоим шаблонам.
         const [driveResult, decree, award] =
             await Promise.all([
                 drive.files.get({

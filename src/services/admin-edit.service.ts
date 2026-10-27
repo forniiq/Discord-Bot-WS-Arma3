@@ -1,5 +1,6 @@
 import { findPlayer } from '@/database/queries';
 import { buildPlayerDashboard } from '@/utils/dashboard.utils';
+import { MessageFlags } from 'discord.js';
 
 export async function openEditPanel(options: {
     interaction: any;
@@ -10,7 +11,7 @@ export async function openEditPanel(options: {
     const { targetDiscordUser, pUID } = options;
 
     if (interaction?.deferReply && !interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     }
 
     let player = null;
@@ -27,7 +28,7 @@ export async function openEditPanel(options: {
         if (interaction.editReply) {
             return void await interaction.editReply({ content: messageContent });
         } else {
-            return void await interaction.reply({ content: messageContent, ephemeral: true });
+            return void await interaction.reply({ content: messageContent, flags: MessageFlags.Ephemeral });
         }
     }
 
@@ -41,6 +42,6 @@ export async function openEditPanel(options: {
     if (interaction.editReply) {
         return void await interaction.editReply(replyData);
     } else {
-        return void await interaction.reply({ ...replyData, ephemeral: true });
+        return void await interaction.reply({ ...replyData, flags: MessageFlags.Ephemeral });
     }
 }

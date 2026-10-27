@@ -13,11 +13,6 @@ const issuerRoleIds = new Set(
     DECREE_ISSUERS.map(issuer => issuer.roleId)
 );
 
-
-// ============================================================
-// Добавить участника в кэш
-// ============================================================
-
 function cacheMember(member: GuildMember) {
     for (const roleId of issuerRoleIds) {
         if (member.roles.cache.has(roleId)) {
@@ -26,11 +21,6 @@ function cacheMember(member: GuildMember) {
     }
 }
 
-
-// ============================================================
-// Удалить участника из кэша
-// ============================================================
-
 function removeMember(memberId: string) {
     for (const [roleId, member] of issuerMembers) {
         if (member.id === memberId) {
@@ -38,12 +28,6 @@ function removeMember(memberId: string) {
         }
     }
 }
-
-
-// ============================================================
-// Полная синхронизация
-// Вызывается один раз при запуске бота
-// ============================================================
 
 export async function initializeIssuerCache(
     guild: Guild
@@ -60,11 +44,6 @@ export async function initializeIssuerCache(
     );
 }
 
-
-// ============================================================
-// Обновление участника
-// ============================================================
-
 export function updateIssuerMember(
     member: GuildMember
 ) {
@@ -72,21 +51,11 @@ export function updateIssuerMember(
     cacheMember(member);
 }
 
-
-// ============================================================
-// Удаление участника
-// ============================================================
-
 export function removeIssuerMember(
     memberId: string
 ) {
     removeMember(memberId);
 }
-
-
-// ============================================================
-// Получить текущего обладателя должности
-// ============================================================
 
 export function getIssuerMember(
     roleId: string

@@ -115,7 +115,7 @@ export async function findItemsBySteamId(
             SELECT *
             FROM items
             WHERE steamid = :steamid
-              AND srok > NOW()
+            AND srok > NOW()
             ORDER BY srok ASC
             `,
             {

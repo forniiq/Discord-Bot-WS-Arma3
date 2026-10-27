@@ -1,5 +1,3 @@
-// Укороченные названия слотов
-
 export const SLOT_ABBREVIATIONS: Record<string, string> = {
     "[*] Инженер": "Инженер",
     "[*] Инженер [[LEGION]": "Инженер LEGION",

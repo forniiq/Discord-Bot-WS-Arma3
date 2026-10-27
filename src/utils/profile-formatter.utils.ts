@@ -5,7 +5,6 @@ import { UNITS, TOGGLE_CATEGORIES } from '@/config/roles-сonfig';
 import { parseArmaArray } from '@/utils/array-parser.utils';
 
 export function formatPlayerProfileEmbed(player: PlayerInfo, discordUserTag: string, avatarUrl: string): EmbedBuilder {
-    // 1. Расчет звания и опыта
     const rankIndex = parseInt(player.pLvl, 10) || 0;
     const currentRankObj = RANKS_DATA[rankIndex] || { name: 'Неизвестно', exp: 0, shortName: 'Н/Д' };
     const nextRankObj = RANKS_DATA[rankIndex + 1];
@@ -13,10 +12,8 @@ export function formatPlayerProfileEmbed(player: PlayerInfo, discordUserTag: str
     let progressText = 'Максимальное звание достигнуто! 👑';
     if (nextRankObj) {
         const currentExp = player.pExp || 0;
-        // Если в RANKS_DATA хранятся пороги для перехода на следующий ранг:
         const requiredExp = nextRankObj.exp; 
-        
-        // Защита от деления на ноль и некорректных данных
+
         const diffTotal = Math.max(1, requiredExp);
         const diffCurrent = Math.min(Math.max(0, currentExp), diffTotal);
         
@@ -30,10 +27,8 @@ export function formatPlayerProfileEmbed(player: PlayerInfo, discordUserTag: str
             `📊 Опыт: \`${currentExp.toLocaleString()}\` / \`${requiredExp.toLocaleString()}\` XP`;
     }
 
-    // 2. Отряд
     const unitName = UNITS[player.pUnits] || player.pUnits || 'Не назначен';
 
-    // 3. Форматирование допусков (ВВС, БТВ, РП, Инструктора, Курсы, Админка)
     function parseCategoryString(columnValue: string | null | undefined, configKey: keyof typeof TOGGLE_CATEGORIES): string {
         const flags = parseArmaArray(columnValue);
         const catConfig = TOGGLE_CATEGORIES[configKey];
@@ -77,7 +72,7 @@ export function formatPlayerProfileEmbed(player: PlayerInfo, discordUserTag: str
             { name: '🎓 Курсы и Навыки', value: coursesList, inline: true },
             { name: '⚙️ Полномочия / Админка', value: bossList, inline: true }
         )
-        .setColor('#3b82f6') // Синий тактический стиль
+        .setColor('#3b82f6')
         .setFooter({ text: `Запрос от пользователя: ${discordUserTag} • War Spectra Database` })
         .setTimestamp();
 

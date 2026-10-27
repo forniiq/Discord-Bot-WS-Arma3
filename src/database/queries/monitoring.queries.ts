@@ -14,7 +14,6 @@ export interface InfoData {
     FPS?: string;
 }
 
-// Получить актуальную информацию о текущем состоянии ЗБД
 export async function getCurrentInfo(): Promise<InfoData | null> {
     try {
         const rows = await sequelize.query<InfoData>(

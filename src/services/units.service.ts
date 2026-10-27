@@ -8,7 +8,6 @@ export async function refreshUnitsCache(): Promise<void> {
     try {
         const unitsList = await getAllUnits();
 
-        // 1. Очищаем старые отряды (сохраняя базовый дефолт "0")
         for (const key of Object.keys(UNITS)) {
             if (key !== "0") delete UNITS[key];
         }
@@ -16,7 +15,6 @@ export async function refreshUnitsCache(): Promise<void> {
             delete ROLES_CONFIG.units[key];
         }
 
-        // 2. Заполняем актуальными данными из БД (согласно интерфейсу UnitData: uUID, uName, uTag, dRoleID)
         for (const unit of unitsList) {
             const uidStr = String(unit.uUID);
             const tagStr = unit.uTag || unit.uName;

@@ -5,7 +5,6 @@ import {
     TextInputStyle,
     ActionRowBuilder,
     EmbedBuilder,
-    PermissionsBitField,
     StringSelectMenuBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -21,7 +20,6 @@ import {
 import { requireOperator } from '@/utils/operator.utils';
 
 export default async function (interaction: Interaction) {
-    // SELECT: УПРАВЛЕНИЕ ПРОМОКОДОМ
     if (
         interaction.isStringSelectMenu() &&
         interaction.customId === 'select_promo_manage'
@@ -136,13 +134,9 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // Всё ниже работает только с кнопками
     if (!interaction.isButton()) return;
 
-    // СОЗДАНИЕ ПРОМОКОДА
     if (interaction.customId === 'btn_create_promo') {
-
-        // Проверяем оператора ДО открытия админского Modal
         const isOperator = await requireOperator(
             interaction.user.id
         ).catch(() => false);
@@ -203,7 +197,6 @@ export default async function (interaction: Interaction) {
         return void await interaction.showModal(modal);
     }
 
-    // СПИСОК ПРОМОКОДОВ
     if (interaction.customId === 'btn_list_promo') {
 
         const isOperator = await requireOperator(
@@ -267,7 +260,6 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // РЕДАКТИРОВАНИЕ ПРОМОКОДА
     if (
         interaction.customId.startsWith('btn_edit_promo:')
     ) {
@@ -374,7 +366,6 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // УДАЛЕНИЕ ПРОМОКОДА
     if (
         interaction.customId.startsWith('btn_delete_promo:')
     ) {
@@ -428,11 +419,7 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // ВВОД ПРОМОКОДА ИГРОКОМ
     if (interaction.customId === 'btn_open_promo') {
-
-        // НИКАКОЙ requireOperator ЗДЕСЬ НЕТ
-
         const modal = new ModalBuilder()
             .setCustomId('modal_use_promo')
             .setTitle('Активация промокода');

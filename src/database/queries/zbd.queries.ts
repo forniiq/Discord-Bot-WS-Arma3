@@ -16,7 +16,6 @@ export interface ZBDInfo {
 
 export type LogZBD = ZBDInfo;
 
-// Получить последнее необработанное ЗБД (dCheck = 0)
 export async function getLastUnprocessedZbd(): Promise<ZBDInfo | null> {
     const rows = await sequelize.query<ZBDInfo>(
         'SELECT * FROM log_zbd WHERE dCheck = 0 ORDER BY Date DESC LIMIT 1',
@@ -25,7 +24,6 @@ export async function getLastUnprocessedZbd(): Promise<ZBDInfo | null> {
     return rows[0] || null;
 }
 
-// Получить самое последнее ЗБД
 export async function getCurrentZbd(): Promise<ZBDInfo | null> {
     const rows = await sequelize.query<ZBDInfo>(
         'SELECT * FROM log_zbd ORDER BY Date DESC LIMIT 1',
@@ -34,7 +32,6 @@ export async function getCurrentZbd(): Promise<ZBDInfo | null> {
     return rows[0] || null;
 }
 
-// Пометить текущую запись ЗБД как обработанную
 export async function markZbdProcessed(date: string): Promise<void> {
     await sequelize.query(
         'UPDATE log_zbd SET dCheck = 1 WHERE Date <= :date AND dCheck = 0',
@@ -45,7 +42,6 @@ export async function markZbdProcessed(date: string): Promise<void> {
     );
 }
 
-// Пометить все старые записи ЗБД как обработанные
 export async function markAllOldZbdProcessed(): Promise<void> {
     await sequelize.query('UPDATE log_zbd SET dCheck = 1 WHERE dCheck = 0', {
         type: QueryTypes.UPDATE,

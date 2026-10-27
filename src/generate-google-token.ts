@@ -1,4 +1,3 @@
-
 import { authenticate } from '@google-cloud/local-auth';
 import { google } from 'googleapis';
 import fs from 'node:fs/promises';
@@ -24,7 +23,6 @@ const TOKEN_PATH = path.join(
 async function main() {
     await fs.mkdir(SECRETS_DIR, { recursive: true });
 
-    // Проверяем наличие OAuth Client credentials.
     await fs.access(CREDENTIALS_PATH);
 
     console.log('Запускаем Google OAuth...');
@@ -49,7 +47,6 @@ async function main() {
         'utf8',
     );
 
-    // Проверяем доступ к Google Drive.
     const drive = google.drive({
         version: 'v3',
         auth: auth as any,

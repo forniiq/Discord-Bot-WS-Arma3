@@ -1,9 +1,6 @@
-// утилита для форматирования Embed последнего ЗБД
-
 import { EmbedBuilder } from 'discord.js';
 import type { LogZBD } from '@/database/queries';
 
-// Перевод секунд в формат "1ч 30м 15с" или "45м 10с"
 function formatDuration(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -22,7 +19,7 @@ export function createZbdEmbed(zbd: LogZBD): EmbedBuilder {
 
     return new EmbedBuilder()
         .setTitle(`📊 Итоги ЗБД — ${zbd.City}`)
-        .setColor(isSuccess ? '#57F287' : '#ED4245') // Зеленый для успеха, красный для провала
+        .setColor(isSuccess ? '#57F287' : '#ED4245')
         .setFields(
             {
                 name: '📌 Статус',

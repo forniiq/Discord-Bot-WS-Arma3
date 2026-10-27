@@ -5,7 +5,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder, 
-    ChannelType 
+    ChannelType, 
+    MessageFlags
 } from 'discord.js';
 import { sendLog } from '@/utils/logger.utils';
 import { SERVER_CONFIG } from '@/config/server.config';
@@ -50,7 +51,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!targetChannel || !('send' in targetChannel)) {
         return void ctx.interaction.reply({ 
             content: '❌ **Ошибка:** Указанный канал не найден или в него нельзя отправлять сообщения.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
@@ -83,12 +84,12 @@ export const chatInput: ChatInputCommand = async (ctx) => {
 
         return void ctx.interaction.reply({ 
             content: `✅ Панель управления рестартами успешно отправлена в канал <#${targetChannel.id}>!`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     } catch (err) {
         return void ctx.interaction.reply({ 
             content: `❌ Не удалось отправить панель в канал: ${err}`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };

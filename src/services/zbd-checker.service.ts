@@ -4,7 +4,7 @@ import { createZbdEmbed } from '@/utils/zbd-embed.utils';
 import { SERVER_CONFIG } from '@/config/server.config';
 
 const ZBD_CHANNEL_ID = SERVER_CONFIG.discord.channels.zbd as string;
-const CHECK_INTERVAL_MS = 30 * 1000; // Проверка каждые 30 секунд
+const CHECK_INTERVAL_MS = 30 * 1000;
 
 export async function startZbdChecker(client: Client, skipOldOnStart: boolean = false): Promise<void> {
     if (skipOldOnStart) {
@@ -13,7 +13,6 @@ export async function startZbdChecker(client: Client, skipOldOnStart: boolean = 
 
     setInterval(async () => {
         try {
-            // Берем самое последнее ЗБД
             const zbd = await getLastUnprocessedZbd();
             if (!zbd || !zbd.Date) return;
 
@@ -24,7 +23,6 @@ export async function startZbdChecker(client: Client, skipOldOnStart: boolean = 
                 return;
             }
 
-            // Отправляем Embed с последним ЗБД
             const embed = createZbdEmbed(zbd);
             await channel.send({ embeds: [embed] });
 

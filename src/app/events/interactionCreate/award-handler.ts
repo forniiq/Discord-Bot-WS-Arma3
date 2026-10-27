@@ -3,7 +3,7 @@ import {
     AttachmentBuilder,
     ButtonBuilder,
     ButtonStyle,
-    GuildMember,
+    MessageFlags,
     ModalBuilder,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
@@ -36,26 +36,14 @@ import { SERVER_CONFIG } from '@/config/server.config';
 
 interface AwardSession {
     number: number;
-
     playerId?: string;
-
     medalValue?: string;
-
     issuerValue?: string;
-
     png?: Buffer;
-
     decreeNumber?: number;
 }
 
 const sessions = new Map<string, AwardSession>();
-
-
-/*
- * =========================
- * Создание приказа
- * =========================
- */
 
 async function handleAwardCreate(
     interaction: any,
@@ -79,13 +67,6 @@ async function handleAwardCreate(
     await interaction.showModal(modal);
 }
 
-
-/*
- * =========================
- * Номер приказа
- * =========================
- */
-
 async function handleAwardNumberModal(
     interaction: any,
 ) {
@@ -98,7 +79,7 @@ async function handleAwardNumberModal(
     if (!Number.isInteger(number) || number <= 0) {
         await interaction.reply({
             content: '❌ Номер приказа должен быть положительным целым числом.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -120,16 +101,9 @@ async function handleAwardNumberModal(
     await interaction.reply({
         content: 'Выберите игрока, которого необходимо наградить.',
         components: [row],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
     });
 }
-
-
-/*
- * =========================
- * Выбор игрока
- * =========================
- */
 
 async function handleAwardPlayer(
     interaction: any,
@@ -141,7 +115,7 @@ async function handleAwardPlayer(
     if (!session) {
         await interaction.reply({
             content: '❌ Сессия создания приказа не найдена.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -173,13 +147,6 @@ async function handleAwardPlayer(
     });
 }
 
-
-/*
- * =========================
- * Выбор медали
- * =========================
- */
-
 async function handleAwardMedal(
     interaction: any,
 ) {
@@ -190,7 +157,7 @@ async function handleAwardMedal(
     if (!session) {
         await interaction.reply({
             content: '❌ Сессия создания приказа не найдена.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -222,20 +189,13 @@ async function handleAwardMedal(
     });
 }
 
-
-/*
- * =========================
- * Выбор издателя
- * =========================
- */
-
 async function handleAwardIssuer(interaction: any) {
     const session = sessions.get(interaction.user.id);
 
     if (!session) {
         await interaction.reply({
             content: '❌ Сессия создания приказа не найдена.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
         return;
     }
@@ -250,7 +210,7 @@ async function handleAwardIssuer(interaction: any) {
     if (!issuerConfig) {
         await interaction.reply({
             content: '❌ Неизвестный издатель приказа.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
         return;
     }
@@ -258,7 +218,7 @@ async function handleAwardIssuer(interaction: any) {
     if (!session.playerId) {
         await interaction.reply({
             content: '❌ Награждаемый игрок не выбран.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
         return;
     }
@@ -266,14 +226,13 @@ async function handleAwardIssuer(interaction: any) {
     if (!session.medalValue) {
         await interaction.reply({
             content: '❌ Медаль не выбрана.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
         return;
     }
 
-    // Сразу подтверждаем interaction
     await interaction.deferReply({
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
     });
 
     try {
@@ -376,13 +335,6 @@ async function handleAwardIssuer(interaction: any) {
     }
 }
 
-
-/*
- * =========================
- * Event Handler
- * =========================
- */
-
 export default (async (interaction) => {
 
     if (!interaction.isButton() &&
@@ -396,10 +348,6 @@ export default (async (interaction) => {
         return;
     }
 
-    /*
-     * Кнопка создания награждения
-     */
-
     if (
         interaction.isButton() &&
         interaction.customId === 'btn_award_create'
@@ -407,10 +355,6 @@ export default (async (interaction) => {
         await handleAwardCreate(interaction);
         return;
     }
-
-    /*
-     * Номер приказа
-     */
 
     if (
         interaction.isModalSubmit() &&
@@ -420,10 +364,6 @@ export default (async (interaction) => {
         return;
     }
 
-    /*
-     * Выбор игрока
-     */
-
     if (
         interaction.isUserSelectMenu() &&
         interaction.customId === 'award_player'
@@ -432,10 +372,6 @@ export default (async (interaction) => {
         return;
     }
 
-    /*
-     * Выбор медали
-     */
-
     if (
         interaction.isStringSelectMenu() &&
         interaction.customId === 'award_medal'
@@ -443,10 +379,6 @@ export default (async (interaction) => {
         await handleAwardMedal(interaction);
         return;
     }
-
-    /*
-     * Выбор издателя
-     */
 
     if (
         interaction.isStringSelectMenu() &&
@@ -492,7 +424,7 @@ async function handleAwardPublish(
         await interaction.reply({
             content:
                 '❌ Сессия создания приказа не найдена или уже завершена.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -505,7 +437,7 @@ async function handleAwardPublish(
         await interaction.reply({
             content:
                 '❌ Готовый приказ не найден.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -523,7 +455,7 @@ async function handleAwardPublish(
         await interaction.reply({
             content:
                 '❌ Канал для публикации приказов не найден.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
 
         return;
@@ -564,7 +496,7 @@ async function handleAwardPublish(
         await interaction.reply({
             content:
                 '❌ Не удалось опубликовать приказ.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 }

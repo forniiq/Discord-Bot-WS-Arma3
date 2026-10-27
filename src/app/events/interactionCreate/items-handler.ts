@@ -5,6 +5,7 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
+    MessageFlags,
     ModalBuilder,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
@@ -342,7 +343,7 @@ async function showPlayerItems(
         return void interaction.reply({
             content:
                 `ℹ️ У игрока **${escapeMarkdown(playerName)}** нет активных Items.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -397,7 +398,7 @@ async function showPlayerItems(
     return void interaction.reply({
         embeds: [embed],
         components: [row],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
     });
 }
 
@@ -412,7 +413,7 @@ async function showItem(
         return void interaction.reply({
             content:
                 '❌ Этот item больше не существует.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -497,7 +498,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -514,7 +515,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -546,7 +547,7 @@ const handler: EventHandler<'interactionCreate'> =
         return void interaction.reply({
             content:
                 '❌ SteamID64 должен состоять ровно из 17 цифр.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -561,7 +562,7 @@ const handler: EventHandler<'interactionCreate'> =
         return void interaction.reply({
             content:
                 '❌ Срок должен быть целым числом от **1 до 3650 дней**.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -574,7 +575,7 @@ const handler: EventHandler<'interactionCreate'> =
         return void interaction.reply({
             content:
                 `❌ Игрок с SteamID \`${steamid}\` не найден в базе.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -648,7 +649,7 @@ const handler: EventHandler<'interactionCreate'> =
     return void interaction.reply({
         embeds: [embed],
         components: [row],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
     });
     }
 
@@ -660,7 +661,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -673,7 +674,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ SteamID64 должен состоять ровно из 17 цифр.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -686,7 +687,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     `❌ Игрок с SteamID \`${steamid}\` не найден в базе.`,
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -706,7 +707,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -715,7 +716,7 @@ const handler: EventHandler<'interactionCreate'> =
         if (!value) {
             return void interaction.reply({
                 content: '❌ Item не выбран.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -724,7 +725,7 @@ const handler: EventHandler<'interactionCreate'> =
         if (!Number.isInteger(itemId)) {
             return void interaction.reply({
                 content: '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -744,7 +745,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -753,7 +754,7 @@ const handler: EventHandler<'interactionCreate'> =
         if (!token) {
             return void interaction.reply({
                 content: '❌ Некорректная сессия добавления.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -766,7 +767,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Сессия добавления истекла. Начните добавление заново.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -775,14 +776,14 @@ const handler: EventHandler<'interactionCreate'> =
         if (!code) {
             return void interaction.reply({
                 content: '❌ Сторона не выбрана.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
         if (!isValidItemSide(code)) {
             return void interaction.reply({
                 content: '❌ Некорректная сторона.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -908,7 +909,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -917,7 +918,7 @@ const handler: EventHandler<'interactionCreate'> =
         if (!token) {
             return void interaction.reply({
                 content: '❌ Некорректная сессия редактирования.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -930,7 +931,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Сессия редактирования истекла. Начните редактирование заново.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -939,14 +940,14 @@ const handler: EventHandler<'interactionCreate'> =
         if (!code) {
             return void interaction.reply({
                 content: '❌ Сторона не выбрана.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
         if (!isValidItemSide(code)) {
             return void interaction.reply({
                 content: '❌ Некорректная сторона.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1074,7 +1075,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1087,7 +1088,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1098,7 +1099,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Item уже был удалён.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1121,7 +1122,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1134,7 +1135,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1155,7 +1156,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ ClassName не может быть пустым.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1167,7 +1168,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Срок должен быть целым числом от **1 до 3650 дней**.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1178,7 +1179,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Этот item больше не существует.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1261,7 +1262,7 @@ const handler: EventHandler<'interactionCreate'> =
         return void interaction.reply({
             embeds: [embed],
             components: [row],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -1275,7 +1276,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1288,7 +1289,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1299,7 +1300,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Item уже был удалён.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1356,7 +1357,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1369,7 +1370,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1459,7 +1460,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ У вас нет роли для управления донатными Items.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -1472,7 +1473,7 @@ const handler: EventHandler<'interactionCreate'> =
             return void interaction.reply({
                 content:
                     '❌ Некорректный ID item.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 

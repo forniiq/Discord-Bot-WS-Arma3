@@ -1,5 +1,3 @@
-// Генератор Дашборда Profile Embed
-
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { PlayerInfo } from '@/database/queries';
 import {
@@ -113,7 +111,6 @@ export function buildPlayerDashboard(player: PlayerInfo) {
         )
         .setFooter({ text: 'Используйте элементы управления ниже для быстрого редактирования' });
 
-    // Меню выбора категории редактирования
     const selectMenu = new StringSelectMenuBuilder()
         .setCustomId(`edit_select_category:${player.pUID}`)
         .setPlaceholder('⚙️ Выберите раздел для редактирования...')

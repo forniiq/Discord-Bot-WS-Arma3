@@ -6,7 +6,8 @@ import {
     ActionRowBuilder, 
     StringSelectMenuBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } from 'discord.js';
 import { findPlayer, updatePlayerField } from '@/database/queries';
 import { buildPlayerDashboard } from '@/utils/dashboard.utils';
@@ -34,12 +35,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         !interaction.isModalSubmit()
     ) return;
 
-    // 1. Выбор категории из главного меню
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("edit_select_category:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -50,10 +50,9 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const selectedCategory = interaction.values[0];
         const player = await findPlayer({ steamId: pUID });
         if (!player) {
-            return void interaction.reply({ content: "❌ Игрок не найден в базе данных.", ephemeral: true });
+            return void interaction.reply({ content: "❌ Игрок не найден в базе данных.", flags: MessageFlags.Ephemeral });
         }
 
-        // А) Модальное окно (Ник, Опыт, Карма)
         if (selectedCategory === "modal_main") {
             const modal = new ModalBuilder()
                 .setCustomId(`modal_save_main:${pUID}`)
@@ -91,7 +90,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             return void await interaction.showModal(modal);
         }
 
-        // Б) Выбор звания
         if (selectedCategory === "select_rank") {
             const rankMenu = new StringSelectMenuBuilder()
                 .setCustomId(`save_rank:${pUID}`)
@@ -111,7 +109,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             });
         }
 
-        // В) Выбор отряда
         if (selectedCategory === "select_unit") {
             const unitMenu = new StringSelectMenuBuilder()
                 .setCustomId(`save_unit:${pUID}`)
@@ -131,7 +128,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             });
         }
 
-        // Г) Флажки / Допуски
         if (selectedCategory === "admin") {
             const adminArray = parseArmaArray(player.pAdmin);
 
@@ -139,7 +135,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             const currentAdminPanel = adminArray[1] ?? 0;
             const currentExpBonus = adminArray[3] ?? 0;
 
-            // SelectMenu уровня администрации
             const adminLevelMenu = new StringSelectMenuBuilder()
                 .setCustomId(`save_admin_level:${pUID}`)
                 .setPlaceholder("Выберите уровень администрации");
@@ -152,7 +147,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 });
             });
 
-            // SelectMenu доступа к ВП-панели
             const adminPanelMenu = new StringSelectMenuBuilder()
                 .setCustomId(`save_admin_panel:${pUID}`)
                 .setPlaceholder("Доступ к ВП-панели");
@@ -165,7 +159,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 });
             });
 
-            // Кнопка изменения бонуса к опыту
             const bonusButton = new ButtonBuilder()
                 .setCustomId(`edit_admin_bonus:${pUID}`)
                 .setLabel("✏️ Изменить бонус к опыту")
@@ -211,7 +204,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             });
         }
 
-        // Д) Выбор изменения префикса (pTitle)
         if (selectedCategory === "edit_title") {
             const colorMenu = new StringSelectMenuBuilder()
                 .setCustomId(`preset_title_color:${pUID}`)
@@ -303,12 +295,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         }
     }
 
-    // 2. Сохранение Звания / Отряда
     if (interaction.isStringSelectMenu() && (interaction.customId.startsWith("save_rank:") || interaction.customId.startsWith("save_unit:"))) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -324,11 +315,9 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         let updatedPlayer = await findPlayer({ steamId: pUID });
         if (!updatedPlayer) return;
 
-        // Синхронизируем роли и никнейм в Discord (гильдия передается как any для предотвращения TS ошибки)
         await syncPlayerProfile(interaction.guild as any, updatedPlayer);
         updatedPlayer = (await findPlayer({ steamId: pUID })) || updatedPlayer;
 
-        // Логирование
         const fieldName = field === "pLvl" ? "Звание" : "Отряд";
         await sendLog('INFO', 'AdminEdit', `Администратор \`${interaction.user.tag}\` изменил **${fieldName}** игроку \`${updatedPlayer.pName}\` (pUID: ${pUID})`);
 
@@ -336,12 +325,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.update({ content: "✅ Изменения сохранены и роли синхронизированы!", ...dashboard });
     }
 
-    // 3. Сохранение Флажков / Допусков
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("save_admin_level:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -354,7 +342,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!Number.isInteger(newAdminLevel) || newAdminLevel < 0 || newAdminLevel > 7) {
             return void interaction.reply({
                 content: "❌ Некорректный уровень администрации.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -363,7 +351,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -373,7 +361,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             adminArray.push(0);
         }
 
-        // Меняем только индекс 0
         adminArray[0] = newAdminLevel;
 
         await updatePlayerField(
@@ -408,7 +395,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -421,7 +408,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (newAdminPanel !== 0 && newAdminPanel !== 1) {
             return void interaction.reply({
                 content: "❌ Некорректное значение ВП-панели.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -430,7 +417,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -440,7 +427,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             adminArray.push(0);
         }
 
-        // Меняем только индекс 1
         adminArray[1] = newAdminPanel;
 
         await updatePlayerField(
@@ -475,7 +461,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -503,7 +489,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.update({ content: "✅ Допуски обновлены и роли синхронизированы!", ...dashboard });
     }
 
-    // Выбор показателя времени
     if (
         interaction.isStringSelectMenu() &&
         interaction.customId.startsWith("select_time_metric:")
@@ -511,7 +496,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: "❌ У вас нет доступа к этому действию.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -525,7 +510,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!category) {
             return void interaction.reply({
                 content: "❌ Неизвестный показатель времени.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -534,7 +519,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -576,7 +561,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void await interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -590,7 +575,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!category) {
             return void await interaction.reply({
                 content: '❌ Неизвестная категория должности.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -603,7 +588,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!validOption) {
             return void await interaction.reply({
                 content: '❌ Недопустимое значение должности.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -612,7 +597,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void await interaction.reply({
                 content: '❌ Игрок не найден в базе данных.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -622,7 +607,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             bossArray.push(0);
         }
 
-        // Меняем только выбранный индекс, остальные должности сохраняются.
         bossArray[index] = selectedValue;
 
         const saved = await updatePlayerField(
@@ -634,7 +618,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!saved) {
             return void await interaction.reply({
                 content: '❌ Не удалось сохранить должность.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -643,7 +627,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!updatedPlayer) {
             return void await interaction.reply({
                 content: '⚠️ Должность сохранена, но профиль не удалось загрузить.',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -667,12 +651,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 4. Сохранение Модального Окна (Ручная смена никнейма, опыта, кармы)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_main:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -707,7 +690,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: "❌ У вас нет доступа к этому действию.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -721,7 +704,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!category) {
             return void interaction.reply({
                 content: "❌ Неизвестный показатель времени.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -731,14 +714,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const minutesText = interaction.fields
             .getTextInputValue("timeMinutes").trim();
 
-        // Разрешаем только целые неотрицательные числа
         if (
             !/^\d+$/.test(hoursText) ||
             !/^\d+$/.test(minutesText)
         ) {
             return void interaction.reply({
                 content: "❌ Введите целое неотрицательное количество часов и минут.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -753,7 +735,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         ) {
             return void interaction.reply({
                 content: "❌ Некорректное значение времени.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -764,18 +746,16 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
         const timeArray = parseArmaArray(player.pTime);
 
-        // Гарантируем наличие всех шести показателей
         while (timeArray.length < 6) {
             timeArray.push(0);
         }
 
-        // Меняем только выбранный показатель
         timeArray[index] = totalMinutes;
 
         const saved = await updatePlayerField(
@@ -787,7 +767,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!saved) {
             return void interaction.reply({
                 content: "❌ Не удалось сохранить время в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -796,7 +776,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!updatedPlayer) {
             return void interaction.reply({
                 content: "⚠️ Время сохранено, но не удалось повторно загрузить профиль.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -816,12 +796,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 5. Обработка выбора цвета из готового пресета (выпадающий список)
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("preset_title_color:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -848,7 +827,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -861,7 +840,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -887,12 +866,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.showModal(modal);
     }
 
-    // 6. Обработка нажатия на кнопку "Ввести свой HEX вручную"
     if (interaction.isButton() && interaction.customId.startsWith("manual_title_prompt:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -925,12 +903,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.showModal(modal);
     }
 
-    // 7. Сохранение префикса (после выбора цвета из пресета)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_preset_title:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -938,7 +915,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         const text = interaction.fields.getTextInputValue("titleText").trim();
         if (!pUID) return;
 
-        // Если текст пустой — очищаем префикс, иначе записываем в формате #FF1493FFТекст
         const finalTitle = text ? `${hexColor}FF${text}` : "";
 
         await updatePlayerField(pUID, "pTitle", finalTitle);
@@ -956,12 +932,11 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void await interaction.editReply({ content: "✅ Кастомный префикс успешно обновлен!", ...dashboard });
     }
 
-    // 8. Сохранение префикса (после ручного ввода HEX)
     if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_save_custom_title:")) {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -995,7 +970,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -1010,7 +985,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!bonusText) {
             return void interaction.reply({
                 content: "❌ Введите бонус к опыту.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -1019,7 +994,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!Number.isFinite(newExpBonus) || newExpBonus < 0) {
             return void interaction.reply({
                 content: "❌ Некорректный бонус к опыту. Введите число, например `0.3`, `1` или `1.2`.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -1028,7 +1003,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!player) {
             return void interaction.reply({
                 content: "❌ Игрок не найден в базе данных.",
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -1038,7 +1013,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
             adminArray.push(0);
         }
 
-        // Меняем только индекс 3
         adminArray[3] = newExpBonus;
 
         await updatePlayerField(

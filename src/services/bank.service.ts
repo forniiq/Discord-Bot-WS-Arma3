@@ -19,10 +19,8 @@ export async function updateBankDisplay(client: Client): Promise<void> {
     try {
         const currentBalance = await getBankBalance();
 
-        // 1. Пропускаем, если баланс не менялся и сообщение уже существует
         if (lastKnownBalance === currentBalance) return;
 
-        // 2. Получаем канал
         const channel = client.channels.cache.get(BANK_CHANNEL_ID) || 
                         await client.channels.fetch(BANK_CHANNEL_ID).catch(() => null);
 
@@ -43,7 +41,6 @@ export async function updateBankDisplay(client: Client): Promise<void> {
 
         let message = null;
 
-        // 3. Пытаемся найти существующее сообщение
         const bankMessageId = getMessageId('bank');
 
         if (bankMessageId) {
@@ -66,7 +63,6 @@ export async function updateBankDisplay(client: Client): Promise<void> {
             );
         }
 
-        // Обновляем кэш баланса только ПОСЛЕ успешной отправки/изменения
         lastKnownBalance = currentBalance;
 
     } catch (error) {
@@ -74,9 +70,7 @@ export async function updateBankDisplay(client: Client): Promise<void> {
     }
 }
 
-// Запускает постоянный цикл проверки банка
 export async function startBankAutoSync(client: Client) {
-    // Первоначальный запуск
     await updateBankDisplay(client);
 
     setInterval(async () => {

@@ -16,7 +16,6 @@ import { SERVER_CONFIG } from '@/config/server.config';
 
 const INSTRUCTORS_CHAT_ID = SERVER_CONFIG.discord.channels.instructorsChat as string;
 
-// Вспомогательная функция генерации карточки бойца
 async function generateStudentHeader(userId: string, stepInfo: string) {
     const student = await getPlayerExpData(userId);
     const rankInfo = student ? (RANKS_DATA[student.pLvl] ?? { name: 'Рекрут', exp: 100 }) : { name: 'Рекрут', exp: 100 };
@@ -50,7 +49,6 @@ async function generateStudentHeader(userId: string, stepInfo: string) {
     return { embed, student };
 }
 
-// Рендер кнопок категорий (сетка)
 function getCategoryButtons() {
     const categories = Object.values(EXAM_DATA);
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -78,7 +76,6 @@ function getCategoryButtons() {
 const handler: EventHandler<"interactionCreate"> = async (interaction, client) => {
     if (!interaction.guild) return;
 
-    // 1. Открытие главного меню оплаты из канала (Reply)
     if (interaction.isButton() && interaction.customId === 'btn_start_exam_pay') {
         await interaction.deferReply({
             flags: MessageFlags.Ephemeral
@@ -107,7 +104,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         });
     }
 
-    // 2. Кнопка возврата в главное меню (Update)
     if (interaction.isButton() && interaction.customId === 'exam_back_to_main') {
         await interaction.deferUpdate().catch(() => {});
         const { embed } = await generateStudentHeader(interaction.user.id, 'Шаг 1 из 3 • Выберите категорию');
@@ -119,7 +115,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         });
     }
 
-    // 3. Выбор категории (Кнопка категории)
     if (interaction.isButton() && interaction.customId.startsWith('exam_cat_')) {
         await interaction.deferUpdate().catch(() => {});
         const categoryId = interaction.customId.replace('exam_cat_', '');
@@ -157,7 +152,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         });
     }
 
-    // 4. Выбор конкретного курса / допуска (Выпадающее меню) -> Выбор инструктора
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_exam_item:')) {
         await interaction.deferUpdate().catch(() => {});
         const parts = interaction.customId.split(':');
@@ -175,13 +169,10 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         const requiredRoleId = getRequiredInstructorRoleId(categoryId, itemId);
         const guild = interaction.guild;
 
-        // ГАРАНТИРОВАННОЕ ПОЛУЧЕНИЕ ВСЕХ ИНСТРУКТОРОВ С СЕРВЕРА
         let instructors;
         if (requiredRoleId) {
-            // Подтягиваем роль и всех её участников с сервера
             const role = await guild.roles.fetch(requiredRoleId).catch(() => null);
             if (role) {
-                // Если у роли есть метод .members, подгружаем их на всякий случай
                 await guild.members.fetch().catch(() => {});
                 instructors = role.members.filter(m => !m.user.bot);
             } else {
@@ -223,7 +214,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
                     label: inst.displayName.slice(0, 100),
                     value: inst.id,
                     description: `@${inst.user.username}`
-                })).slice(0, 25) // Дискорд позволяет максимум 25 элементов в селект-меню
+                })).slice(0, 25)
             );
 
         const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(instructorMenu);
@@ -240,7 +231,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
         });
     }
 
-    // 5. Финальный выбор инструктора и проведение транзакции
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_instructor:')) {
         await interaction.deferUpdate().catch(() => {});
         const parts = interaction.customId.split(':');
@@ -296,7 +286,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction, client) =
 
         await interaction.editReply({ embeds: [successEmbed], components: [] });
 
-        // Отправка отчета в чат инструкторов
         if (INSTRUCTORS_CHAT_ID) {
             try {
                 const fetchedChannel = await client.channels.fetch(INSTRUCTORS_CHAT_ID).catch(() => null);

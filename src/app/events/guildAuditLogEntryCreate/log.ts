@@ -5,7 +5,6 @@ import { sendAdminLog } from '@/utils/logger.utils';
 const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, guild) => {
     const { action, reason, changes, targetId, executorId, extra } = auditLogEntry;
 
-    // 1. Получаем executor или фетчим его при отсутствии в кэше
     let executor = auditLogEntry.executor;
 
     if (!executor && executorId) {
@@ -16,18 +15,12 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
         }
     }
 
-    // Игнорируем действия ботов (опционально, уберите если нужны логи ботов)
     if (executor?.bot) return;
 
-    // Безопасное формирование упоминаний и тегов
     const executorTag = executor && 'tag' in executor && executor.tag ? `\`${executor.tag}\`` : 'Неизвестный модератор';
     const executorMention = executor ? `<@${executor.id}>` : (executorId ? `<@${executorId}>` : 'Неизвестно');
 
     switch (action) {
-        // ==========================================
-        // 🏠 НАСТРОЙКИ СЕРВЕРА
-        // ==========================================
-
         case AuditLogEvent.GuildUpdate: {
             if (!changes) break;
 
@@ -65,11 +58,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 👥 ДЕЙСТВИЯ С УЧАСТНИКАМИ СЕРВЕРА
-        // ==========================================
-
-        // 🗑️ Удаление сообщения
         case AuditLogEvent.MessageDelete: {
             await sendAdminLog({
                 title: '🗑️ Удаление сообщения модератором',
@@ -80,7 +68,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🔨 Бан участника
         case AuditLogEvent.MemberBanAdd: {
             await sendAdminLog({
                 title: '🔨 Блокировка участника',
@@ -95,7 +82,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🔓 Разбан участника
         case AuditLogEvent.MemberBanRemove: {
             await sendAdminLog({
                 title: '🔓 Разблокировка участника',
@@ -109,7 +95,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 👢 Кик участника
         case AuditLogEvent.MemberKick: {
             await sendAdminLog({
                 title: '👢 Исключение участника (Kick)',
@@ -124,11 +109,9 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🏷️ Изменение участника (Никнейм, Таймаут, Мьюты)
         case AuditLogEvent.MemberUpdate: {
             if (!changes) break;
 
-            // Изменение никнейма
             const nickChange = changes.find((c: any) => c.key === 'nick');
             if (nickChange) {
                 const oldNick = (nickChange.old as string) || 'Без никнейма';
@@ -147,7 +130,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                 });
             }
 
-            // Выдача / снятие таймаута
             const timeoutChange = changes.find((c: any) => c.key === 'communication_disabled_until');
             if (timeoutChange) {
                 const until = timeoutChange.new as string | undefined;
@@ -161,15 +143,14 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                     color: isMuted ? '#f1c40f' : '#2ecc71',
                     fields: isMuted
                         ? [
-                              { name: 'До', value: `<t:${Math.floor(new Date(until).getTime() / 1000)}:F>`, inline: true },
-                              { name: '📝 Причина', value: `\`${reason || 'Не указана'}\``, inline: true }
-                          ]
+                            { name: 'До', value: `<t:${Math.floor(new Date(until).getTime() / 1000)}:F>`, inline: true },
+                            { name: '📝 Причина', value: `\`${reason || 'Не указана'}\``, inline: true }
+                        ]
                         : [],
                     executorId: executorId || executor?.id,
                 });
             }
 
-            // Серверный мут в голосовых каналах
             const muteChange = changes.find((c: any) => c.key === 'mute');
             if (muteChange) {
                 const isMuted = Boolean(muteChange.new);
@@ -181,7 +162,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
                 });
             }
 
-            // Серверный деаф (глушение наушников)
             const deafChange = changes.find((c: any) => c.key === 'deaf');
             if (deafChange) {
                 const isDeafened = Boolean(deafChange.new);
@@ -195,7 +175,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🎭 Изменение ролей участника
         case AuditLogEvent.MemberRoleUpdate: {
             if (!changes) break;
 
@@ -230,7 +209,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🔀 Перемещение пользователя в голосовом канале
         case AuditLogEvent.MemberMove: {
             const channelChange = changes?.find((c: any) => c.key === 'channel_id');
             const targetChannelId = channelChange?.new as string | undefined;
@@ -244,7 +222,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🔌 Принудительное отключение от голосового канала
         case AuditLogEvent.MemberDisconnect: {
             await sendAdminLog({
                 title: '🔌 Отключение от войса',
@@ -255,11 +232,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 💬 МОДЕРАЦИЯ ТЕКСТОВЫХ И ГОЛОСОВЫХ КАНАЛОВ
-        // ==========================================
-
-        // 🧹 Очистка чата (Bulk Delete)
         case AuditLogEvent.MessageBulkDelete: {
             const count = (extra as { count?: number })?.count ?? 'Неизвестно';
 
@@ -273,7 +245,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 📌 Закрепление сообщения
         case AuditLogEvent.MessagePin: {
             await sendAdminLog({
                 title: '📌 Закрепление сообщения',
@@ -284,7 +255,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 📍 Открепление сообщения
         case AuditLogEvent.MessageUnpin: {
             await sendAdminLog({
                 title: '📍 Открепление сообщения',
@@ -295,7 +265,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ✏️ Редактирование параметров канала
         case AuditLogEvent.ChannelUpdate: {
             if (!changes) break;
             const fields: { name: string; value: string; inline?: boolean }[] = [];
@@ -322,11 +291,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 🛡️ УПРАВЛЕНИЕ РОЛЯМИ И ПРАВАМИ
-        // ==========================================
-
-        // ➕ Создание роли
         case AuditLogEvent.RoleCreate: {
             const roleName = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'Новая роль';
             await sendAdminLog({
@@ -338,7 +302,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ➖ Удаление роли
         case AuditLogEvent.RoleDelete: {
             const oldName = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'Удаленная роль';
             await sendAdminLog({
@@ -350,7 +313,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ✏️ Изменение роли (права, название, цвет)
         case AuditLogEvent.RoleUpdate: {
             if (!changes) break;
 
@@ -391,11 +353,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 📁 ИЗМЕНЕНИЕ СТРУКТУРЫ СЕРВЕРА
-        // ==========================================
-
-        // 📁 Создание канала или категории
         case AuditLogEvent.ChannelCreate: {
             const channelName = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'канал';
             await sendAdminLog({
@@ -407,7 +364,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🗑️ Удаление канала или категории
         case AuditLogEvent.ChannelDelete: {
             const oldName = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'неизвестно';
             await sendAdminLog({
@@ -419,7 +375,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🔒 Создание/изменение/удаление локальных прав канала (Overwrites)
         case AuditLogEvent.ChannelOverwriteCreate:
         case AuditLogEvent.ChannelOverwriteUpdate:
         case AuditLogEvent.ChannelOverwriteDelete: {
@@ -431,10 +386,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             });
             break;
         }
-
-        // ==========================================
-        // 🌐 ВЕБХУКИ И ИНТЕГРАЦИИ
-        // ==========================================
 
         case AuditLogEvent.WebhookCreate: {
             const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'вебхук';
@@ -467,10 +418,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 📅 МЕРОПРИЯТИЯ (SCHEDULED EVENTS)
-        // ==========================================
-
         case AuditLogEvent.GuildScheduledEventCreate: {
             const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'Событие';
             await sendAdminLog({
@@ -501,10 +448,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             });
             break;
         }
-
-        // ==========================================
-        // 🤖 ПРАВИЛА АВТОМОДЕРАЦИИ (AUTOMOD)
-        // ==========================================
 
         case AuditLogEvent.AutoModerationRuleCreate: {
             const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'Правило';
@@ -537,11 +480,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ==========================================
-        // 📜 ПРИГЛАШЕНИЯ, ЭМОДЗИ И СТИКЕРЫ
-        // ==========================================
-
-        // ✉️ Создание приглашения
         case AuditLogEvent.InviteCreate: {
             const code = changes?.find((c: any) => c.key === 'code')?.new as string;
             await sendAdminLog({
@@ -553,7 +491,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ❌ Удаление приглашения
         case AuditLogEvent.InviteDelete: {
             const code = changes?.find((c: any) => c.key === 'code')?.old as string;
             await sendAdminLog({
@@ -565,7 +502,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 😀 Добавление эмодзи
         case AuditLogEvent.EmojiCreate: {
             const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'эмодзи';
             await sendAdminLog({
@@ -577,7 +513,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ✏️ Обновление эмодзи
         case AuditLogEvent.EmojiUpdate: {
             const oldName = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'эмодзи';
             const newName = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'эмодзи';
@@ -590,7 +525,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🗑️ Удаление эмодзи
         case AuditLogEvent.EmojiDelete: {
             const name = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'эмодзи';
             await sendAdminLog({
@@ -602,7 +536,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🎨 Добавление стикера
         case AuditLogEvent.StickerCreate: {
             const name = (changes?.find((c: any) => c.key === 'name')?.new as string) || 'стикер';
             await sendAdminLog({
@@ -614,7 +547,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // ✏️ Редактирование стикера
         case AuditLogEvent.StickerUpdate: {
             await sendAdminLog({
                 title: '✏️ Обновление стикера',
@@ -625,7 +557,6 @@ const handler: EventHandler<'guildAuditLogEntryCreate'> = async (auditLogEntry, 
             break;
         }
 
-        // 🗑️ Удаление стикера
         case AuditLogEvent.StickerDelete: {
             const name = (changes?.find((c: any) => c.key === 'name')?.old as string) || 'стикер';
             await sendAdminLog({

@@ -7,7 +7,6 @@ export const RANKS = [
     "Ген.Майор", "Ген.Лейтенант", "Ген.Полковник", "Ген.Армии", "Маршал"
 ];
 
-// Динамический словарь названий отрядов (заполняется из БД при старте)
 export const UNITS: Record<string, string> = {
     "0": "Без отряда",
 };
@@ -50,7 +49,6 @@ export interface CategoryRoleRule {
     childrenRoleIds: (string | null)[];
 }
 
-// Конфигурация ролей для Основного сервера
 const PROD_ROLES_CONFIG = {
     units: {} as Record<string, { roleId: string | null; tag: string }>,
     categoryUnitsRoleId: "1532982390262075633" as string | null, // ID роли-категории отрядов
@@ -155,10 +153,8 @@ const PROD_ROLES_CONFIG = {
     categoryCoursesRoleId: "1262342579438092346" as string | null
 };
 
-// Проверяем, является ли текущий запуск тестовым сервером
 const isTestServer = SERVER_CONFIG.discord.isTestServer || process.env.NODE_ENV === "development";
 
-// Вспомогательная функция для обнуления ролей
 function nullifyRoles<T>(config: T): T {
     if (!isTestServer) return config;
 

@@ -1,5 +1,5 @@
 import type { CommandData, CommandMetadata, UserContextMenuCommand } from 'commandkit';
-import { ApplicationCommandType } from 'discord.js';
+import { ApplicationCommandType, MessageFlags } from 'discord.js';
 import { openEditPanel } from '@/services/admin-edit.service';
 import { SERVER_CONFIG } from '@/config/server.config';
 import { requireOperator } from '@/utils/operator.utils';
@@ -19,7 +19,7 @@ export const userContextMenu: UserContextMenuCommand = async (ctx) => {
     if (!(await requireOperator(interaction.user.id))) {
         return void interaction.reply({
             content: '❌ У вас нет доступа к редактированию игроков.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 

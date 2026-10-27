@@ -16,7 +16,6 @@ export type PromoRedeemResult =
     | { success: true; gainedExp: number; newLvl: number; newExp: number; rankChanged: boolean }
     | { success: false; error: 'NOT_FOUND' | 'INACTIVE' | 'EXPIRED' | 'ALREADY_USED' | 'PLAYER_NOT_FOUND' | 'DB_ERROR' };
 
-// 1. Создание или обновление промокода (сбросит UsedUsers, если это новый промокод)
 export async function createPromocode(
     name: string,
     exp: number,
@@ -26,8 +25,8 @@ export async function createPromocode(
     try {
         await sequelize.query(
             `INSERT INTO promocod (Name, PromoEXP, PromoActiv, UsedUsers, ExpiresAt) 
-             VALUES (:name, :exp, :activations, '[]', :expiresAt)
-             ON DUPLICATE KEY UPDATE PromoEXP = :exp, PromoActiv = :activations, ExpiresAt = :expiresAt`,
+            VALUES (:name, :exp, :activations, '[]', :expiresAt)
+            ON DUPLICATE KEY UPDATE PromoEXP = :exp, PromoActiv = :activations, ExpiresAt = :expiresAt`,
             {
                 replacements: { name, exp, activations, expiresAt },
                 type: QueryTypes.INSERT,
@@ -40,7 +39,6 @@ export async function createPromocode(
     }
 }
 
-// 2. Получение одного промокода
 export async function getPromocode(name: string, transaction?: Transaction): Promise<PromocodeData | null> {
     try {
         const rows = await sequelize.query<PromocodeData>(
@@ -49,7 +47,7 @@ export async function getPromocode(name: string, transaction?: Transaction): Pro
                     CAST(PromoActiv AS SIGNED) as PromoActiv,
                     UsedUsers,
                     ExpiresAt
-             FROM promocod WHERE Name = :name LIMIT 1`,
+            FROM promocod WHERE Name = :name LIMIT 1`,
             {
                 replacements: { name },
                 type: QueryTypes.SELECT,
@@ -63,7 +61,6 @@ export async function getPromocode(name: string, transaction?: Transaction): Pro
     }
 }
 
-// 3. Редактирование существующего промокода (без сброса UsedUsers)
 export async function updatePromocode(
     name: string,
     exp: number,
@@ -73,8 +70,8 @@ export async function updatePromocode(
     try {
         await sequelize.query(
             `UPDATE promocod 
-             SET PromoEXP = :exp, PromoActiv = :activations, ExpiresAt = :expiresAt 
-             WHERE Name = :name`,
+            SET PromoEXP = :exp, PromoActiv = :activations, ExpiresAt = :expiresAt 
+            WHERE Name = :name`,
             {
                 replacements: { name, exp, activations, expiresAt },
                 type: QueryTypes.UPDATE,
@@ -87,7 +84,6 @@ export async function updatePromocode(
     }
 }
 
-// 4. Удаление промокода
 export async function deletePromocode(name: string): Promise<boolean> {
     try {
         await sequelize.query(
@@ -104,7 +100,6 @@ export async function deletePromocode(name: string): Promise<boolean> {
     }
 }
 
-// 5. Получение списка всех промокодов
 export async function getAllPromocodes(): Promise<PromocodeData[]> {
     try {
         const rows = await sequelize.query<PromocodeData>(
@@ -113,8 +108,8 @@ export async function getAllPromocodes(): Promise<PromocodeData[]> {
                     CAST(PromoActiv AS SIGNED) as PromoActiv, 
                     UsedUsers, 
                     ExpiresAt 
-             FROM promocod 
-             ORDER BY Name ASC`,
+            FROM promocod 
+            ORDER BY Name ASC`,
             { type: QueryTypes.SELECT }
         );
         return rows;
@@ -124,7 +119,6 @@ export async function getAllPromocodes(): Promise<PromocodeData[]> {
     }
 }
 
-// 6. Атомарная активация промокода
 export async function redeemPromocode(discId: string, promoName: string): Promise<PromoRedeemResult> {
     const t = await sequelize.transaction();
 

@@ -6,7 +6,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder, 
-    ChannelType 
+    ChannelType, 
+    MessageFlags
 } from 'discord.js';
 
 export const metadata: CommandMetadata = {
@@ -15,8 +16,8 @@ export const metadata: CommandMetadata = {
 };
 
 export const command: CommandData = {
-    name: 'setup-promo',
-    description: '📢 Отправить панель ввода промокода',
+    name: 'setup-promo-create',
+    description: '📢 Отправить панель управления промокодами',
     options: [
         {
             name: 'channel',
@@ -49,15 +50,16 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!targetChannel || !('send' in targetChannel)) {
         return void ctx.interaction.reply({ 
             content: '❌ **Ошибка:** Указанный канал не найден или в него нельзя отправлять сообщения.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('🔥 ВВЕСТИ ПРОМОКОД')
+        .setTitle('🔥 ЦЕНТР УПРАВЛЕНИЯ ПРОМОКОДАМИ')
         .setDescription(
-            'Добро пожаловать в центр управления промокодами.\n\n' +
-            'Нажмите на кнопку ниже, чтобы ввести ваш промокод и получить бонус.'
+            'Добро пожаловать в панель администратора.\n\n' +
+            '• Нажмите **«Создать промокод»**, чтобы добавить новый код.\n' +
+            '• Нажмите **«Список промокодов»**, чтобы просмотреть активные коды и их статистику.'
         )
         .setColor('#10b981')
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
@@ -65,22 +67,27 @@ export const chatInput: ChatInputCommand = async (ctx) => {
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_open_promo')
-            .setLabel('Ввести промокод')
+            .setCustomId('btn_create_promo')
+            .setLabel('Создать промокод')
             .setEmoji('🗝️')
-            .setStyle(ButtonStyle.Success)
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('btn_list_promo')
+            .setLabel('Список промокодов')
+            .setEmoji('📋')
+            .setStyle(ButtonStyle.Primary)
     );
 
     try {
         await targetChannel.send({ embeds: [embed], components: [row] });
         return void ctx.interaction.reply({ 
-            content: `✅ Панель ввода промокода успешно отправлена в канал <#${targetChannel.id}>!`, 
-            ephemeral: true 
+            content: `✅ Панель управления успешно отправлена в канал <#${targetChannel.id}>!`, 
+            flags: MessageFlags.Ephemeral 
         });
     } catch (err) {
         return void ctx.interaction.reply({ 
             content: `❌ Не удалось отправить панель в канал: ${err}`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };

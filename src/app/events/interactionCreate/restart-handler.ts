@@ -3,7 +3,8 @@ import {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } from 'discord.js';
 import { sendLog, sendAdminLog } from '@/utils/logger.utils';
 import { spawn } from 'child_process';
@@ -22,7 +23,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -48,7 +49,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void interaction.reply({
             embeds: [confirmEmbed],
             components: [confirmRow],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -56,7 +57,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -84,11 +85,10 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return void interaction.reply({
             embeds: [confirmEmbed],
             components: [confirmRow],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
-    // 2. Отмена
     if (interaction.customId === 'cancel_restart') {
         return void interaction.update({
             content: '❌ **Перезапуск сервера отменен.**',
@@ -105,23 +105,20 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         });
     }
 
-    // 3. Подтверждение рестарта
     if (interaction.customId === 'confirm_restart') {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
-        // Обновляем сообщение администратора
         await interaction.update({
             content: `⏳ **Запускается процесс рестарта сервера...**`,
             embeds: [],
             components: []
         });
 
-        // Пути
         const batDir = path.dirname(RESTART_PATH);
         const batFile = path.basename(RESTART_PATH);
 
@@ -133,7 +130,6 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         console.log(`[ArmaRestart] CWD: ${batDir}`);
         console.log(`[ArmaRestart] BAT: ${batFile}`);
 
-        // Запускаем BAT
         const restartProcess = spawn(
             cmdPath,
             ['/d', '/c', batFile],
@@ -159,7 +155,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 content:
                     `❌ **Не удалось запустить рестарт:**\n` +
                     `\`${error.message}\``,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             }).catch(() => null);
         });
 
@@ -266,11 +262,10 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         if (!(await requireOperator(interaction.user.id))) {
             return void interaction.reply({
                 content: '❌ У вас нет доступа к этому действию.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
-        // Обновляем сообщение администратора
         await interaction.update({
             content: '⏳ **Выключается сервер...**',
             embeds: [],
@@ -313,7 +308,7 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
                 content:
                     `❌ **Не удалось выключить сервер:**\n` +
                     `\`${error.message}\``,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             }).catch(() => null);
         });
 

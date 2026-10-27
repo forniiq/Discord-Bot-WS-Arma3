@@ -6,7 +6,6 @@ import { sendLog } from '@/utils/logger.utils';
 export async function runBulkSync(guild: any, interaction: any) {
     const startTime = Date.now();
 
-    // 1. Первичный статус
     const initialEmbed = new EmbedBuilder()
         .setTitle('🔄 Запуск массовой синхронизации...')
         .setDescription('📡 Кэширование всех участников Discord сервера...')
@@ -18,7 +17,6 @@ export async function runBulkSync(guild: any, interaction: any) {
         components: [] 
     });
 
-    // 2. БЕЗОПАСНАЯ загрузка всех участников гильдии в кэш
     try {
         await guild.members.fetch({ query: '', time: 60_000 });
     } catch (err) {
@@ -27,7 +25,6 @@ export async function runBulkSync(guild: any, interaction: any) {
 
     const allDbPlayers = await findAllSyncablePlayers();
     
-    // ФИЛЬТРАЦИЯ: Обрабатываем ТОЛЬКО тех, кто сейчас есть на сервере
     const targetPlayers = allDbPlayers.filter(p => p.DiscID && guild.members.cache.has(p.DiscID));
     const totalPlayers = targetPlayers.length;
 
@@ -46,7 +43,6 @@ export async function runBulkSync(guild: any, interaction: any) {
     let errors = 0;
     let skipped = 0;
 
-    // Безопасные лимиты Discord API для массовых правко ролей/ников (5 запросов раз в 1.2 сек)
     const CHUNK_SIZE = 5;
     const DELAY_MS = 1200;
 
@@ -57,7 +53,6 @@ export async function runBulkSync(guild: any, interaction: any) {
 
         await Promise.all(chunk.map(async (player) => {
             try {
-                // Извлекаем участника строго из уже загруженного кэша
                 const cachedMember = guild.members.cache.get(player.DiscID!);
                 
                 if (!cachedMember) {
@@ -65,7 +60,6 @@ export async function runBulkSync(guild: any, interaction: any) {
                     return;
                 }
 
-                // Передаем гарантированно существующий cachedMember, чтобы syncPlayerProfile НЕ делал fetch()
                 const res = await syncPlayerProfile(guild, player, cachedMember);
                 if (res.roleSuccess) rolesUpdated++;
                 if (res.nameSuccess) namesUpdated++;
@@ -77,7 +71,6 @@ export async function runBulkSync(guild: any, interaction: any) {
             }
         }));
 
-        // Обновляем прогресс-бар в дискорде раз в 3.5 секунды
         if (Date.now() - lastUpdateUI > 3500 || processed === totalPlayers) {
             lastUpdateUI = Date.now();
             const percent = Math.round((processed / totalPlayers) * 100);
@@ -107,7 +100,6 @@ export async function runBulkSync(guild: any, interaction: any) {
 
     const durationSeconds = Math.round((Date.now() - startTime) / 1000);
 
-    // 3. Финальный ответ в чат
     const finalEmbed = new EmbedBuilder()
         .setTitle('✅ Массовая синхронизация завершена!')
         .setColor('#2ecc71')
@@ -127,7 +119,6 @@ export async function runBulkSync(guild: any, interaction: any) {
         embeds: [finalEmbed] 
     });
 
-    // 4. Лог операции
     await sendLog(
         'INFO', 
         'BulkSync', 

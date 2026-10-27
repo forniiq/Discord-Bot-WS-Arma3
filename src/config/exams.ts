@@ -4,15 +4,15 @@ export interface ExamItem {
     id: string;
     label: string;
     cost: number;
-    taxPercent?: number; // Налог в банк
-    requiredRoleId?: string | null; // Специфическая роль инструктора для конкретного экзамена
+    taxPercent?: number;
+    requiredRoleId?: string | null;
 }
 
 export interface ExamCategory {
     id: string;
     label: string;
     items: ExamItem[];
-    defaultTaxPercent: number; // Налог по умолчанию для всей категории
+    defaultTaxPercent: number;
 }
 
 export const EXAM_DATA: Record<string, ExamCategory> = {
@@ -32,7 +32,6 @@ export const EXAM_DATA: Record<string, ExamCategory> = {
         label: '🛡️ БТВ',
         defaultTaxPercent: 20,
         items: [
-            // Мехвод БТВ доступен инструкторам мехводов (индекс 3 в kmb) или отдельной роли
             { id: 'bmp_driver', label: 'Водитель БМП ', cost: 1000, requiredRoleId: ROLES_CONFIG.kmb[8] }, 
             { id: 'btv_1', label: 'БТВ 1', cost: 2000 },
             { id: 'btv_2', label: 'БТВ 2', cost: 3000 },
@@ -65,24 +64,21 @@ export const EXAM_DATA: Record<string, ExamCategory> = {
     },
 };
 
-// Определение роли инструктора для выбранного экзамена.
 export function getRequiredInstructorRoleId(categoryId: string, itemId?: string): string | null {
-    // 1. Проверяем, есть ли у самого предмета специфика по роли
     const category = EXAM_DATA[categoryId];
     if (category && itemId) {
         const item = category.items.find(i => i.id === itemId);
         if (item?.requiredRoleId) return item.requiredRoleId;
     }
 
-    // 2. Иначе берем дефолтную роль по категории
     const roles = ROLES_CONFIG.kmb;
     switch (categoryId) {
         case 'vvs':
-            return roles[0] ?? null; // Инструктор Лётчиков (ВВС)
+            return roles[0] ?? null;
         case 'btv':
-            return roles[1] ?? null; // Инструктор Танкистов (БТВ)
+            return roles[1] ?? null;
         case 'factions':
-            return roles[2] ?? null; // Инструктор РП сторон
+            return roles[2] ?? null;
         case 'courses':
             return ROLES_CONFIG.categoryInstructorsRoleId ?? null; 
         default:

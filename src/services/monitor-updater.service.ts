@@ -1,5 +1,3 @@
-// Мониторинг онлайна сервера
-
 import { Client, EmbedBuilder, TextChannel, ActivityType } from "discord.js";
 import { sendLog } from "@/utils/logger.utils";
 import { getOnlinePlayers, OnlinePlayer } from "@/database/queries";
@@ -10,18 +8,15 @@ import { SERVER_CONFIG } from '@/config/server.config';
 import { getMessageId, setMessageId } from '@/utils/message-state';
 import { getCanonicalUnitName } from "@/config/units";
 
-// Пик онлайна за день
 let peakOnlineToday = 0;
 let peakResetDate = new Date().toDateString();
 
 const MAX_ONLINE = SERVER_CONFIG.monitor.maxOnline;
 
-// Запуск мониторинга
 export async function StartMonitorUpdater(client: Client) {
     const channelId = SERVER_CONFIG.discord.channels.monitor;
     const messageId = getMessageId('monitor');
 
-    // Получение канала
     const channel = await client.channels.fetch(channelId);
 
     if (!channel || !channel.isTextBased()) {
@@ -33,14 +28,12 @@ export async function StartMonitorUpdater(client: Client) {
 
     let message = null;
 
-    // Попытка восстановить существующее сообщение мониторинга
     if (isValidId(messageId)) {
         message = await textChannel.messages
             .fetch(messageId)
             .catch(() => null);
     }
 
-    // Если сообщение не найдено — создаём новое
     if (!message) {
         const players = await getOnlinePlayers();
         const zbd = await getCurrentInfo();
@@ -60,17 +53,14 @@ export async function StartMonitorUpdater(client: Client) {
 
     let isUpdating = false;
 
-    // Основной цикл обновления мониторинга
     setInterval(async () => {
         if (isUpdating) return;
         isUpdating = true;
 
         try {
-            // Получение актуального списка игроков и текущего ЗБД
             const players = await getOnlinePlayers();
             const zbd = await getCurrentInfo();
 
-            // Обновление статуса бота
             const status =
                 players.length === 0
                     ? "Сервер пуст"
@@ -82,7 +72,6 @@ export async function StartMonitorUpdater(client: Client) {
 
             if (!message) return;
 
-            // Сброс дневного пика онлайна
             const today = new Date().toDateString();
 
             if (today !== peakResetDate) {
@@ -93,8 +82,7 @@ export async function StartMonitorUpdater(client: Client) {
             if (players.length > peakOnlineToday) {
                 peakOnlineToday = players.length;
             }
-            
-            // Обновление Embed сообщения
+
             await message.edit({
                 embeds: createEmbeds(players, zbd),
             });
@@ -104,14 +92,13 @@ export async function StartMonitorUpdater(client: Client) {
         } finally {
             isUpdating = false;
         }
-    }, SERVER_CONFIG.monitor.updateInterval); // Обновление раз в 30 секунд
+    }, SERVER_CONFIG.monitor.updateInterval);
 }
 
 function isValidId(id: string | null): id is string {
     return !!id && id.length > 10;
 }
 
-// Цвет статуса Embed
 function getStatusColor(online: number): number {
     if (online === 0)
         return 0x1f1f1f;
@@ -140,7 +127,6 @@ function getStatusColor(online: number): number {
     return 0x7b3f8c;
 }
 
-// Текст статуса Embed
 function getStatusText(online: number): string {
     if (online === 0) return "OFFLINE";
 
@@ -151,7 +137,6 @@ function getStatusText(online: number): string {
     return "ВЫСОКАЯ АКТИВНОСТЬ";
 }
 
-// Сокращение/Нормализация слота
 function formatSlot(slot: string, maxLength = 19): string {
     const abbrev = SLOT_ABBREVIATIONS[slot];
     if (abbrev) return abbrev;
@@ -161,7 +146,6 @@ function formatSlot(slot: string, maxLength = 19): string {
         : slot;
 }
 
-// Агрегация слотов
 function getSlotStats(players: OnlinePlayer[]) {
     const slots = new Map<string, number>();
 
@@ -178,7 +162,6 @@ function getSlotStats(players: OnlinePlayer[]) {
         .sort((a, b) => b[1] - a[1]);
 }
 
-// Получение отряда из никнейма
 function getPlayerUnit(name: string): string | null {
     const match = name.match(/^\[(.+?)\]/);
 
@@ -189,7 +172,6 @@ function getPlayerUnit(name: string): string | null {
     return getCanonicalUnitName(match[1]);
 }
 
-// Агрегация отрядов
 function getUnitStats(players: OnlinePlayer[]) {
     const units = new Map<string, number>();
 
@@ -198,11 +180,9 @@ function getUnitStats(players: OnlinePlayer[]) {
 
         if (!unitName) continue;
 
-        // Находим ID отряда по его названию
         const unitId = Object.entries(UNITS)
             .find(([, name]) => name === unitName)?.[0];
 
-        // Отображаем тег из БД вместо названия
         const unitTag = unitId
             ? ROLES_CONFIG.units[unitId]?.tag ?? unitName
             : unitName;
@@ -217,7 +197,6 @@ function getUnitStats(players: OnlinePlayer[]) {
         .sort((a, b) => b[1] - a[1]);
 }
 
-// Выравнивание колонок (Для Embed)
 function normalizeColumns(left: string[], right: string[]) {
     const max = Math.max(left.length, right.length);
 
@@ -230,7 +209,6 @@ function normalizeColumns(left: string[], right: string[]) {
     return { l, r };
 }
 
-// Прогресс бар онлайна
 function createProgressBar(
     current: number,
     max: number
@@ -255,7 +233,6 @@ function formatTime(seconds: number) {
     return `${h}ч ${m}м ${s}с`;
 }
 
-// Сбор всех Embed`ов
 function createEmbeds(players: OnlinePlayer[], zbd: InfoData | null): EmbedBuilder[] {
     players.sort(
         (a, b) => b.pLvlSort - a.pLvlSort
@@ -271,7 +248,6 @@ function createEmbeds(players: OnlinePlayer[], zbd: InfoData | null): EmbedBuild
     ];
 }
 
-// Шапка мониторинга (общая информация)
 function createHeaderEmbed(online: number, zbd: InfoData | null, color: number): EmbedBuilder {
     const unix = Math.floor(Date.now() / 1000);
 
@@ -303,7 +279,6 @@ function createHeaderEmbed(online: number, zbd: InfoData | null, color: number):
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
 }
 
-// Статистика слотов и отрядов
 function createSlotsEmbed(players: OnlinePlayer[], color: number): EmbedBuilder {
     const SLOT_COL_WIDTH = 14;
     const slots = getSlotStats(players)
@@ -336,7 +311,6 @@ function createSlotsEmbed(players: OnlinePlayer[], color: number): EmbedBuilder 
         );
 }
 
-// Список игроков
 function createPlayerEmbeds(players: OnlinePlayer[], color: number): EmbedBuilder[] {
     const embeds: EmbedBuilder[] = [];
 

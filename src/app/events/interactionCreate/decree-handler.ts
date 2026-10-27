@@ -4,7 +4,6 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    GuildMember,
     MessageFlags,
     ModalBuilder,
     PermissionsBitField,
@@ -54,11 +53,6 @@ interface DecreeSession {
 
 const sessions = new Map<string, DecreeSession>();
 
-
-// ============================================================
-// КНОПКА "СОЗДАТЬ ПРИКАЗ"
-// ============================================================
-
 async function handleDecreeCreate(
     interaction: any
 ) {
@@ -90,11 +84,6 @@ async function handleDecreeCreate(
 
     await interaction.showModal(modal);
 }
-
-
-// ============================================================
-// MODAL: НОМЕР + КОЛИЧЕСТВО ПУНКТОВ
-// ============================================================
 
 async function handleDecreeNumberModal(
     interaction: any
@@ -131,13 +120,11 @@ async function handleDecreeNumberModal(
         return;
     }
 
-    // Сохраняем промежуточные данные
     sessions.set(interaction.user.id, {
         number,
         pointsCount,
     });
 
-    // Создаём меню выбора издателя
     const menu = new StringSelectMenuBuilder()
         .setCustomId('decree_issuer')
         .setPlaceholder('Выберите, от кого приказ');
@@ -161,11 +148,6 @@ async function handleDecreeNumberModal(
     });
 }
 
-
-// ============================================================
-// SELECT: "ОТ КОГО ПРИКАЗ"
-// ============================================================
-
 async function handleDecreeIssuer(
     interaction: any
 ) {
@@ -183,7 +165,6 @@ async function handleDecreeIssuer(
 
     const issuerValue = interaction.values[0];
 
-    // Проверяем существование издателя
     const issuer = DECREE_ISSUERS.find(
         item => item.value === issuerValue
     );
@@ -197,10 +178,8 @@ async function handleDecreeIssuer(
         return;
     }
 
-    // Сохраняем выбранного издателя
     session.issuerValue = issuerValue;
 
-    // Создаём меню выбора темы
     const menu = new StringSelectMenuBuilder()
         .setCustomId('decree_subject')
         .setPlaceholder('Выберите тему приказа');
@@ -223,11 +202,6 @@ async function handleDecreeIssuer(
         ],
     });
 }
-
-
-// ============================================================
-// SELECT: "О ЧЁМ ПРИКАЗ"
-// ============================================================
 
 async function handleDecreeSubject(
     interaction: any
@@ -261,10 +235,6 @@ async function handleDecreeSubject(
 
     session.subjectValue = subjectValue;
 
-    // ========================================================
-    // Создаём Modal с полями для пунктов
-    // ========================================================
-
     const modal = new ModalBuilder()
         .setCustomId('decree_points_modal')
         .setTitle('Пункты приказа');
@@ -285,11 +255,6 @@ async function handleDecreeSubject(
 
     await interaction.showModal(modal);
 }
-
-
-// ============================================================
-// MODAL: ТЕКСТ ПУНКТОВ
-// ============================================================
 
 async function handleDecreePointsModal(
     interaction: any
@@ -391,10 +356,6 @@ async function handleDecreePointsModal(
         RANKS[Number(issuerPlayer.pLvl)]
         ?? 'Неизвестное звание';
 
-    // ========================================================
-    // Получаем текст всех пунктов
-    // ========================================================
-
     const points: string[] = [];
 
     for (let i = 1; i <= session.pointsCount; i++) {
@@ -406,10 +367,6 @@ async function handleDecreePointsModal(
     }
 
     try {
-        // ====================================================
-        // Формируем DecreeData
-        // ====================================================
-
         await interaction.deferReply({
             flags: MessageFlags.Ephemeral,
         });
@@ -428,16 +385,8 @@ async function handleDecreePointsModal(
             },
         });
 
-        // ====================================================
-        // Создаём PNG приказа
-        // ====================================================
-
         const png =
             await createDecreeDocument(decree);
-
-        // ====================================================
-        // Отправляем PNG в Discord
-        // ====================================================
 
         session.png = png;
         session.decreeNumber = decree.number;
@@ -512,10 +461,6 @@ async function handleDecreePointsModal(
     }
 }
 
-
-// ============================================================
-// EVENT HANDLER
-// ============================================================
 async function handleDecreePublish(
     interaction: any
 ) {
@@ -632,10 +577,6 @@ const handler: EventHandler<'interactionCreate'> =
             return;
         }
 
-        // ----------------------------------------------------
-        // КНОПКА "СОЗДАТЬ ПРИКАЗ"
-        // ----------------------------------------------------
-
         if (
             interaction.isButton() &&
             interaction.customId === 'btn_decree_create'
@@ -657,10 +598,6 @@ const handler: EventHandler<'interactionCreate'> =
             );
         }
 
-        // ----------------------------------------------------
-        // MODAL: НОМЕР ПРИКАЗА
-        // ----------------------------------------------------
-
         if (
             interaction.isModalSubmit() &&
             interaction.customId === 'decree_number_modal'
@@ -669,10 +606,6 @@ const handler: EventHandler<'interactionCreate'> =
                 interaction
             );
         }
-
-        // ----------------------------------------------------
-        // SELECT: ИЗДАТЕЛЬ
-        // ----------------------------------------------------
 
         if (
             interaction.isStringSelectMenu() &&
@@ -683,10 +616,6 @@ const handler: EventHandler<'interactionCreate'> =
             );
         }
 
-        // ----------------------------------------------------
-        // SELECT: ТЕМА
-        // ----------------------------------------------------
-
         if (
             interaction.isStringSelectMenu() &&
             interaction.customId === 'decree_subject'
@@ -695,10 +624,6 @@ const handler: EventHandler<'interactionCreate'> =
                 interaction
             );
         }
-
-        // ----------------------------------------------------
-        // MODAL: ПУНКТЫ
-        // ----------------------------------------------------
 
         if (
             interaction.isModalSubmit() &&

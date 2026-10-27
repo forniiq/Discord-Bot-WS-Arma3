@@ -78,10 +78,6 @@ export async function createDecreeData(params: {
         issuerPerson,
     } = params;
 
-    // --------------------------------
-    // 1. Находим выбранного издателя
-    // --------------------------------
-
     const issuer = DECREE_ISSUERS.find(
         item => item.value === issuerValue
     );
@@ -90,10 +86,6 @@ export async function createDecreeData(params: {
         throw new Error('Неизвестный тип издателя приказа.');
     }
 
-    // --------------------------------
-    // 3. Находим тему приказа
-    // --------------------------------
-
     const subject = DECREE_SUBJECTS.find(
         item => item.value === subjectValue
     );
@@ -101,10 +93,6 @@ export async function createDecreeData(params: {
     if (!subject) {
         throw new Error('Неизвестная тема приказа.');
     }
-
-    // --------------------------------
-    // 4. Находим исполнителя в БД
-    // --------------------------------
 
     const player = await findPlayer({
         discordId: memberId,
@@ -119,10 +107,6 @@ export async function createDecreeData(params: {
     const executorName = cleanPlayerName(player.pName);
     const executorRank = getRankByLevel(player.pLvl);
 
-    // --------------------------------
-    // 5. Подписи
-    // --------------------------------
-
     const signatures: DecreeSignature[] = [
         {
             title: issuer.label,
@@ -130,10 +114,6 @@ export async function createDecreeData(params: {
             rank: issuerPerson.rank,
         },
     ];
-
-    // --------------------------------
-    // 6. Формируем итоговые данные
-    // --------------------------------
 
     return {
         number,

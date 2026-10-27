@@ -6,7 +6,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder, 
-    ChannelType 
+    ChannelType, 
+    MessageFlags
 } from 'discord.js';
 
 export const metadata: CommandMetadata = {
@@ -15,8 +16,8 @@ export const metadata: CommandMetadata = {
 };
 
 export const command: CommandData = {
-    name: 'setup-promo-create',
-    description: '📢 Отправить панель управления промокодами',
+    name: 'setup-link',
+    description: '📢 Отправить панель привязки аккаунта и синхронизации ролей',
     options: [
         {
             name: 'channel',
@@ -49,44 +50,48 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!targetChannel || !('send' in targetChannel)) {
         return void ctx.interaction.reply({ 
             content: '❌ **Ошибка:** Указанный канал не найден или в него нельзя отправлять сообщения.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('🔥 ЦЕНТР УПРАВЛЕНИЯ ПРОМОКОДАМИ')
+        .setTitle('🎖️ Синхронизация профиля War Spectra')
         .setDescription(
-            'Добро пожаловать в панель администратора.\n\n' +
-            '• Нажмите **«Создать промокод»**, чтобы добавить новый код.\n' +
-            '• Нажмите **«Список промокодов»**, чтобы просмотреть активные коды и их статистику.'
+            'Добро пожаловать! Для получения ролей отряда, званий и допусков на сервере необходимо привязать ваш **Discord** к игровому аккаунту.\n\n' +
+            '### 📌 Инструкция:\n' +
+            '1️⃣ Нажмите кнопку **«Привязать аккаунт»** и введите ваш **SteamID64** (или игровой pUID).\n' +
+            '2️⃣ Нажмите **«Синхронизировать роли»**, если ваши данные на сервере/в БД обновились (например, при получении нового звания или смене отряда).\n\n' +
+            '🔍 **Не знаете свой SteamID64?**\n' +
+            'Вы можете узнать его на сайте: [SteamID.pro](https://steamid.pro/ru/) или [SteamID.io](https://steamid.io/)'
         )
-        .setColor('#10b981')
+        .setColor('#2b2d31')
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_create_promo')
-            .setLabel('Создать промокод')
-            .setEmoji('🗝️')
-            .setStyle(ButtonStyle.Success),
+            .setCustomId('btn_link_steam')
+            .setLabel('Привязать аккаунт')
+            .setEmoji('🔗')
+            .setStyle(ButtonStyle.Primary),
+
         new ButtonBuilder()
-            .setCustomId('btn_list_promo')
-            .setLabel('Список промокодов')
-            .setEmoji('📋')
-            .setStyle(ButtonStyle.Primary)
+            .setCustomId('btn_sync_roles')
+            .setLabel('Синхронизировать роли')
+            .setEmoji('🔄')
+            .setStyle(ButtonStyle.Success)
     );
 
     try {
         await targetChannel.send({ embeds: [embed], components: [row] });
         return void ctx.interaction.reply({ 
-            content: `✅ Панель управления успешно отправлена в канал <#${targetChannel.id}>!`, 
-            ephemeral: true 
+            content: `✅ Панель синхронизации успешно отправлена в канал <#${targetChannel.id}>!`, 
+            flags: MessageFlags.Ephemeral 
         });
     } catch (err) {
         return void ctx.interaction.reply({ 
             content: `❌ Не удалось отправить панель в канал: ${err}`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };

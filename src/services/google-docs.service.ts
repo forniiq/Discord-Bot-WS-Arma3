@@ -38,10 +38,6 @@ export async function createDecreeDocument(
     let documentId: string | undefined;
 
     try {
-        /*
-         * 1. Создаём временную копию шаблона
-         */
-
         const copiedFile = await drive.files.copy({
             fileId: TEMPLATE_DOCUMENT_ID,
             requestBody: {
@@ -57,10 +53,6 @@ export async function createDecreeDocument(
             );
         }
 
-        /*
-         * 2. Формируем текст для подписей
-         */
-
         const signatures = data.signatures
             .map(
                 signature =>
@@ -68,20 +60,12 @@ export async function createDecreeDocument(
             )
             .join('\n\n');
 
-        /*
-         * 3. Формируем текст пунктов приказа
-         */
-
         const points = data.points
             .map(
                 (point, index) =>
                     `${index + 1}. ${point}`
             )
             .join('\n');
-
-        /*
-         * 4. Заменяем переменные в Google Docs
-         */
 
         await docs.documents.batchUpdate({
             documentId,
@@ -163,10 +147,6 @@ export async function createDecreeDocument(
             },
         });
 
-        /*
-         * 5. Экспортируем Google Docs → PDF
-         */
-
         const pdfResponse = await drive.files.export(
             {
                 fileId: documentId,
@@ -180,10 +160,6 @@ export async function createDecreeDocument(
         const pdfBuffer = Buffer.from(
             pdfResponse.data as ArrayBuffer
         );
-
-        /*
-         * 6. PDF → PNG
-         */
 
         const document = await pdf(pdfBuffer, {
             scale: 2,
@@ -203,17 +179,9 @@ export async function createDecreeDocument(
             );
         }
 
-        /*
-         * Пока возвращаем только первую страницу.
-         */
-
         return pngPages[0]!;
 
     } finally {
-        /*
-         * 7. Удаляем временный Google Docs
-         */
-
         if (documentId) {
             try {
                 await drive.files.delete({
@@ -247,10 +215,6 @@ export async function createAwardDecreeDocument(
     let documentId: string | undefined;
 
     try {
-        /*
-         * 1. Создаём временную копию шаблона
-         */
-
         const copiedFile = await drive.files.copy({
             fileId: AWARD_TEMPLATE_DOCUMENT_ID,
             requestBody: {
@@ -265,10 +229,6 @@ export async function createAwardDecreeDocument(
                 'Google Drive не вернул ID созданного документа.'
             );
         }
-
-        /*
-         * 2. Заменяем placeholder'ы
-         */
 
         await docs.documents.batchUpdate({
             documentId,
@@ -378,10 +338,6 @@ export async function createAwardDecreeDocument(
             },
         });
 
-        /*
-         * 3. Экспортируем Google Docs → PDF
-         */
-
         const pdfResponse = await drive.files.export(
             {
                 fileId: documentId,
@@ -395,10 +351,6 @@ export async function createAwardDecreeDocument(
         const pdfBuffer = Buffer.from(
             pdfResponse.data as ArrayBuffer
         );
-
-        /*
-         * 4. PDF → PNG
-         */
 
         const pdfDocument = await pdf(pdfBuffer, {
             scale: 2,
@@ -418,10 +370,6 @@ export async function createAwardDecreeDocument(
             );
         }
 
-        /*
-         * 5. Накладываем медаль поверх готового PNG
-         */
-
         const finalPng = await overlayMedal(
             pngPages[0]!,
             data.medal.filePath
@@ -430,10 +378,6 @@ export async function createAwardDecreeDocument(
         return finalPng;
 
     } finally {
-        /*
-         * 6. Удаляем временный Google Docs
-         */
-
         if (documentId) {
             try {
                 await drive.files.delete({

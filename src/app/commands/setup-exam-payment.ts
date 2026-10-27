@@ -1,5 +1,3 @@
-// Создание Embed для привязки
-
 import { SERVER_CONFIG } from '@/config/server.config';
 import type { ChatInputCommand, CommandData, CommandMetadata } from 'commandkit';
 import { 
@@ -8,7 +6,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder, 
-    ChannelType 
+    ChannelType, 
+    MessageFlags
 } from 'discord.js';
 
 export const metadata: CommandMetadata = {
@@ -17,8 +16,8 @@ export const metadata: CommandMetadata = {
 };
 
 export const command: CommandData = {
-    name: 'setup-activity',
-    description: '📢 Отправить панель просмотра активности отряда',
+    name: 'setup-exam-payment',
+    description: '📢 Отправить панель оплаты экзаменов и допусков',
     options: [
         {
             name: 'channel',
@@ -51,35 +50,37 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!targetChannel || !('send' in targetChannel)) {
         return void ctx.interaction.reply({ 
             content: '❌ **Ошибка:** Указанный канал не найден или в него нельзя отправлять сообщения.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('📟 АКТИВНОСТЬ ОТРЯДА')
-        .setDescription('Нажмите на кнопку ниже для просмотра активности отряда')
+        .setTitle('📚 Оплата экзаменов и допусков')
         .setColor('#2b2d31')
+        .setDescription(
+            'Нажмите на кнопку ниже, чтобы начать процедуру оплаты проведенного экзамена.\n\n' +
+            '⚠️ **Внимание:** В случае нехватки текущего опыта у вас будет понижено звание!'
+        )
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_activity_view')
-            .setLabel('Просмотреть активность отряда')
-            .setEmoji('🔥')
-            .setStyle(ButtonStyle.Primary),
+            .setCustomId('btn_start_exam_pay')
+            .setLabel('💳 Оплатить экзамен')
+            .setStyle(ButtonStyle.Success)
     );
 
     try {
         await targetChannel.send({ embeds: [embed], components: [row] });
         return void ctx.interaction.reply({ 
-            content: `✅ Панель просмотра активности успешно отправлена в канал <#${targetChannel.id}>!`, 
-            ephemeral: true 
+            content: `✅ Панель оплаты экзаменов успешно отправлена в канал <#${targetChannel.id}>!`, 
+            flags: MessageFlags.Ephemeral 
         });
     } catch (err) {
         return void ctx.interaction.reply({ 
             content: `❌ Не удалось отправить панель в канал: ${err}`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };

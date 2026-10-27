@@ -4,7 +4,8 @@ import {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    ComponentType 
+    ComponentType, 
+    MessageFlags
 } from 'discord.js';
 import { runBulkSync } from '@/services/bulk-sync.service';
 import { SERVER_CONFIG } from '@/config/server.config';
@@ -25,7 +26,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!interaction.guild) {
         return void interaction.reply({ 
             content: '❌ Команда доступна только на сервере.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
@@ -68,7 +69,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         if (i.user.id !== interaction.user.id) {
             return void i.reply({
                 content: '❌ Только инициатор команды может подтвердить или отменить действие.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -85,7 +86,6 @@ export const chatInput: ChatInputCommand = async (ctx) => {
                 components: [disabledRow]
             });
 
-            // Решение ошибки TS2345: приведение к any обходит дублирование типов discord.js
             await runBulkSync(interaction.guild as any, interaction as any);
 
         } else if (i.customId === 'cancel_sync') {

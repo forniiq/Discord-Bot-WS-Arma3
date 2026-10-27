@@ -6,7 +6,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder, 
-    ChannelType 
+    ChannelType, 
+    MessageFlags
 } from 'discord.js';
 
 export const metadata: CommandMetadata = {
@@ -15,8 +16,8 @@ export const metadata: CommandMetadata = {
 };
 
 export const command: CommandData = {
-    name: 'setup-exam-payment',
-    description: '📢 Отправить панель оплаты экзаменов и допусков',
+    name: 'setup-promo',
+    description: '📢 Отправить панель ввода промокода',
     options: [
         {
             name: 'channel',
@@ -49,37 +50,38 @@ export const chatInput: ChatInputCommand = async (ctx) => {
     if (!targetChannel || !('send' in targetChannel)) {
         return void ctx.interaction.reply({ 
             content: '❌ **Ошибка:** Указанный канал не найден или в него нельзя отправлять сообщения.', 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('📚 Оплата экзаменов и допусков')
-        .setColor('#2b2d31')
+        .setTitle('🔥 ВВЕСТИ ПРОМОКОД')
         .setDescription(
-            'Нажмите на кнопку ниже, чтобы начать процедуру оплаты проведенного экзамена.\n\n' +
-            '⚠️ **Внимание:** В случае нехватки текущего опыта у вас будет понижено звание!'
+            'Добро пожаловать в центр управления промокодами.\n\n' +
+            'Нажмите на кнопку ниже, чтобы ввести ваш промокод и получить бонус.'
         )
+        .setColor('#10b981')
         .setFooter({ text: 'War Spectra Bot • Code by DRuiD' })
         .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_start_exam_pay')
-            .setLabel('💳 Оплатить экзамен')
+            .setCustomId('btn_open_promo')
+            .setLabel('Ввести промокод')
+            .setEmoji('🗝️')
             .setStyle(ButtonStyle.Success)
     );
 
     try {
         await targetChannel.send({ embeds: [embed], components: [row] });
         return void ctx.interaction.reply({ 
-            content: `✅ Панель оплаты экзаменов успешно отправлена в канал <#${targetChannel.id}>!`, 
-            ephemeral: true 
+            content: `✅ Панель ввода промокода успешно отправлена в канал <#${targetChannel.id}>!`, 
+            flags: MessageFlags.Ephemeral 
         });
     } catch (err) {
         return void ctx.interaction.reply({ 
             content: `❌ Не удалось отправить панель в канал: ${err}`, 
-            ephemeral: true 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };

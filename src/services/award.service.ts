@@ -95,12 +95,6 @@ export async function createAwardDecreeData(params: {
         issuerMember,
     } = params;
 
-    /*
-     * =========================
-     * Награждаемый
-     * =========================
-     */
-
     const player = await findPlayer({
         discordId: playerMember.id,
     });
@@ -111,20 +105,12 @@ export async function createAwardDecreeData(params: {
         );
     }
 
-    // Используем именно Discord Display Name.
     const {
         squad,
         callsign,
     } = parseDisplayName(playerMember.displayName);
 
-    // Игровое звание получаем из БД.
     const playerRank = getRankByLevel(player.pLvl);
-
-    /*
-     * =========================
-     * Медаль
-     * =========================
-     */
 
     const medal = AWARD_MEDALS.find(
         medal => medal.value === medalValue
@@ -143,12 +129,6 @@ export async function createAwardDecreeData(params: {
         medal.fileName
     );
 
-    /*
-     * =========================
-     * Издатель приказа
-     * =========================
-     */
-
     const issuer = DECREE_ISSUERS.find(
         issuer => issuer.value === issuerValue
     );
@@ -159,10 +139,8 @@ export async function createAwardDecreeData(params: {
         );
     }
 
-    // Имя издателя берём именно из Discord Display Name.
     const issuerName = issuerMember.displayName;
 
-    // Звание издателя получаем из БД.
     const issuerPlayer = await findPlayer({
         discordId: issuerMember.id,
     });
@@ -176,12 +154,6 @@ export async function createAwardDecreeData(params: {
     const issuerRank = getRankByLevel(
         issuerPlayer.pLvl
     );
-
-    /*
-     * =========================
-     * Результат
-     * =========================
-     */
 
     return {
         number,

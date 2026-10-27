@@ -13,6 +13,7 @@ import {
     EmbedBuilder,
     ApplicationCommandOptionType,
     ChannelType,
+    MessageFlags,
 } from 'discord.js';
 
 export const metadata: CommandMetadata = {
@@ -79,7 +80,7 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         return void ctx.interaction.reply({
             content:
                 '❌ **Ошибка:** указанный канал не найден или в него нельзя отправлять сообщения.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 
@@ -124,13 +125,13 @@ export const chatInput: ChatInputCommand = async (ctx) => {
         return void ctx.interaction.reply({
             content:
                 `✅ Панель управления Items отправлена в <#${targetChannel.id}>.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     } catch (error) {
         return void ctx.interaction.reply({
             content:
                 `❌ Не удалось отправить панель: ${error}`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     }
 };

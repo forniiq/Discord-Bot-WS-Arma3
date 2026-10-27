@@ -27,7 +27,6 @@ export interface ExamTransactionResult {
     };
 }
 
-// Получить уровень и опыт игрока по Discord ID
 export async function getPlayerExpData(discId: string, transaction?: Transaction): Promise<PlayerExpData | null> {
     const rows = await sequelize.query<PlayerExpData>(
         'SELECT DiscID, CAST(pLvl AS UNSIGNED) as pLvl, CAST(pExp AS UNSIGNED) as pExp FROM players WHERE DiscID = :discId LIMIT 1',
@@ -40,7 +39,6 @@ export async function getPlayerExpData(discId: string, transaction?: Transaction
     return rows[0] ?? null;
 }
 
-// Обновить уровень и опыт игрока по Discord ID
 export async function updatePlayerExpAndRankByDiscId(
     discId: string, 
     pLvl: number, 
@@ -57,7 +55,6 @@ export async function updatePlayerExpAndRankByDiscId(
     );
 }
 
-// Атомарная проведение оплаты экзамена в БД
 export async function processExamTransaction(
     studentDiscId: string,
     instructorDiscId: string,
@@ -80,15 +77,12 @@ export async function processExamTransaction(
             return { success: false, error: 'INSTRUCTOR_NOT_FOUND' };
         }
 
-        // 1. Расчет нового состояния ученика (Списание / Понижение)
         const studentCalc = deductExpWithRankDemotion(student.pLvl, student.pExp, examCost);
         await updatePlayerExpAndRankByDiscId(studentDiscId, studentCalc.newRankIndex, studentCalc.newExp, t);
 
-        // 2. Расчет нового состояния инструктора (Начисление / Повышение)
         const instructorCalc = addExpWithRankPromotion(instructor.pLvl, instructor.pExp, instructorReward);
         await updatePlayerExpAndRankByDiscId(instructorDiscId, instructorCalc.newRankIndex, instructorCalc.newExp, t);
 
-        // 3. Перечисление налога в Банк Опыта
         await addBankExp(taxAmount, t);
 
         await t.commit();

@@ -15,7 +15,6 @@ import { requireOperator } from '@/utils/operator.utils';
 export default async function (interaction: Interaction) {
     if (!interaction.isModalSubmit()) return;
 
-    // СОЗДАНИЕ ПРОМОКОДА
     if (interaction.customId === 'modal_create_promo') {
 
         const isOperator = await requireOperator(
@@ -30,7 +29,6 @@ export default async function (interaction: Interaction) {
         }
 
         try {
-            // Теперь interaction подтверждена
             await interaction.deferReply({
                 flags: MessageFlags.Ephemeral
             });
@@ -171,7 +169,6 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // РЕДАКТИРОВАНИЕ ПРОМОКОДА
     if (
         interaction.customId.startsWith('modal_edit_promo:')
     ) {
@@ -327,12 +324,9 @@ export default async function (interaction: Interaction) {
         return;
     }
 
-    // АКТИВАЦИЯ ПРОМОКОДА ИГРОКОМ
     if (interaction.customId === 'modal_use_promo') {
 
         try {
-            // НИКАКОЙ requireOperator ЗДЕСЬ НЕТ
-
             await interaction.deferReply({
                 flags: MessageFlags.Ephemeral
             });

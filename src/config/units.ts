@@ -8,7 +8,6 @@ function normalizeUnitName(value: string): string {
         .replace(/\s+/g, " ");
 }
 
-// Проверка названий и тегов из актуального кэша БД
 export function getApprovedUnitsSet(): Set<string> {
     const approved = new Set<string>();
 
@@ -27,7 +26,6 @@ export function getApprovedUnitsSet(): Set<string> {
     return approved;
 }
 
-// Преобразование тега из никнейма в название отряда из БД
 export function getCanonicalUnitName(tag: string): string | null {
     const normalizedTag = normalizeUnitName(tag);
 

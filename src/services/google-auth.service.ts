@@ -1,14 +1,7 @@
-
-import { authenticate } from '@google-cloud/local-auth';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-
-const SCOPES = [
-    'https://www.googleapis.com/auth/drive',
-    'https://www.googleapis.com/auth/documents',
-];
 
 const SECRETS_DIR = path.resolve(process.cwd(), 'secrets');
 const CREDENTIALS_PATH = path.join(
@@ -33,26 +26,46 @@ async function saveTokens(auth: OAuth2Client) {
 export async function getGoogleAuth(): Promise<OAuth2Client> {
     await fs.mkdir(SECRETS_DIR, { recursive: true });
 
-    let auth: OAuth2Client;
-
     try {
-        const raw = await fs.readFile(TOKEN_PATH, 'utf8');
-        const credentials = JSON.parse(raw);
+        const rawCredentials = await fs.readFile(
+            CREDENTIALS_PATH,
+            'utf8',
+        );
 
-        if (!credentials.refresh_token) {
+        const credentials = JSON.parse(rawCredentials);
+        const oauthConfig = credentials.installed ?? credentials.web;
+
+        if (
+            !oauthConfig?.client_id ||
+            !oauthConfig?.client_secret
+        ) {
             throw new Error(
-                'В google-token.json отсутствует refresh_token.',
+                'В google-oauth.json отсутствуют client_id или client_secret.',
             );
         }
 
-        auth = new google.auth.OAuth2();
-        auth.setCredentials(credentials);
+        const auth = new google.auth.OAuth2(
+            oauthConfig.client_id,
+            oauthConfig.client_secret,
+            oauthConfig.redirect_uris?.[0],
+        );
 
-        auth.on('tokens', async tokens => {
+        const rawTokens = await fs.readFile(TOKEN_PATH, 'utf8');
+        const tokens = JSON.parse(rawTokens);
+
+        if (!tokens.refresh_token) {
+            throw new Error(
+                'В google-token.json отсутствует refresh_token. Требуется повторная авторизация.',
+            );
+        }
+
+        auth.setCredentials(tokens);
+
+        auth.on('tokens', async newTokens => {
             try {
                 auth.setCredentials({
                     ...auth.credentials,
-                    ...tokens,
+                    ...newTokens,
                 });
 
                 await saveTokens(auth);
@@ -64,20 +77,28 @@ export async function getGoogleAuth(): Promise<OAuth2Client> {
             }
         });
 
-        // Проверяем, что refresh token действительно работает.
         await auth.getAccessToken();
 
         return auth;
     } catch (error) {
-        console.error(
-            'Сохранённая Google OAuth авторизация не работает:',
-            error,
-        );
+        const err = error as {
+            message?: string;
+            code?: string | number;
+            response?: {
+                status?: number;
+                data?: unknown;
+            };
+        };
 
-        // Не запускаем браузер автоматически на сервере.
-        // Повторную авторизацию выполняем отдельно на ПК.
+        console.error('Ошибка Google OAuth:', {
+            message: err.message,
+            code: err.code,
+            status: err.response?.status,
+            response: err.response?.data,
+        });
+
         throw new Error(
-            'Google OAuth недоступен. Проверь refresh_token и настройки Google Cloud.',
+            'Google OAuth недоступен. Проверь подробности ошибки выше.',
             { cause: error },
         );
     }

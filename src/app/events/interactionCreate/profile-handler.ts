@@ -11,18 +11,15 @@ import {
 const handler: EventHandler<"interactionCreate"> = async (interaction) => {
     if (!interaction.guild) return;
 
-    // ОТКРЫТИЕ ПРОФИЛЯ
     if (
         interaction.isButton() &&
         interaction.customId === 'btn_open_profile'
     ) {
         try {
-            // СНАЧАЛА подтверждаем interaction
             await interaction.deferReply({
                 flags: MessageFlags.Ephemeral
             });
 
-            // Только после этого обращаемся к БД
             const player = await findPlayer({
                 discordId: interaction.user.id
             });
@@ -79,16 +76,13 @@ const handler: EventHandler<"interactionCreate"> = async (interaction) => {
         return;
     }
 
-    // ОБНОВЛЕНИЕ ПРОФИЛЯ
     if (
         interaction.isButton() &&
         interaction.customId === 'btn_refresh_profile'
     ) {
         try {
-            // Сначала подтверждаем interaction
             await interaction.deferUpdate();
 
-            // После этого БД
             const player = await findPlayer({
                 discordId: interaction.user.id
             });

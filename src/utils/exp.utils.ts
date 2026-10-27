@@ -1,4 +1,3 @@
-// utils/exp.utils.ts
 import { RANKS_DATA } from '../config/ranks';
 
 export interface ExpOperationResult {
@@ -7,7 +6,6 @@ export interface ExpOperationResult {
     rankChanged: boolean;
 }
 
-// Списание EXP с возможным понижением звания.
 export function deductExpWithRankDemotion(
     currentRankIndex: number,
     currentExp: number,
@@ -18,17 +16,14 @@ export function deductExpWithRankDemotion(
     let remaining = cost;
 
     while (remaining > 0) {
-        // Хватает опыта на текущем звании
         if (exp >= remaining) {
             exp -= remaining;
             remaining = 0;
             break;
         }
 
-        // Не хватает опыта
         remaining -= exp;
 
-        // Ниже рядового не падаем
         if (rankIndex <= 1) {
             rankIndex = 1;
             exp = 0;
@@ -36,10 +31,8 @@ export function deductExpWithRankDemotion(
             break;
         }
 
-        // Понижаемся
         rankIndex--;
 
-        // Получаем полный запас опыта этого звания
         const nextRankCost = RANKS_DATA[rankIndex + 1]?.exp ?? 0;
         exp = nextRankCost;
     }
@@ -51,7 +44,6 @@ export function deductExpWithRankDemotion(
     };
 }
 
-// Начисление EXP с возможным повышением звания.
 export function addExpWithRankPromotion(
     currentRankIndex: number,
     currentExp: number,
@@ -66,7 +58,6 @@ export function addExpWithRankPromotion(
 
         const required = nextRank.exp;
 
-        // Повышение
         if (exp >= required) {
             exp -= required;
             rankIndex++;
