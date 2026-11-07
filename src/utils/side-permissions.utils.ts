@@ -1,6 +1,8 @@
 import {
     ActionRowBuilder,
-    StringSelectMenuBuilder
+    ButtonBuilder,
+    ButtonStyle,
+    EmbedBuilder
 } from 'discord.js';
 
 import type { PlayerInfo } from '@/database/queries';
@@ -8,19 +10,27 @@ import type { PlayerInfo } from '@/database/queries';
 export const SIDE_PERMISSION_FIELDS = [
     {
         field: 'pIND_BTV',
-        label: '🟢 Зелёная сторона — БТВ'
+        side: 'green',
+        label: 'БТВ',
+        emoji: '🚜'
     },
     {
         field: 'pIND_CYP',
-        label: '🟢 Зелёная сторона — ВВС'
+        side: 'green',
+        label: 'ВВС',
+        emoji: '✈️'
     },
     {
         field: 'pBLU_BTV',
-        label: '🔵 Синяя сторона — БТВ'
+        side: 'blue',
+        label: 'БТВ',
+        emoji: '🚜'
     },
     {
         field: 'pBLU_CYP',
-        label: '🔵 Синяя сторона — ВВС'
+        side: 'blue',
+        label: 'ВВС',
+        emoji: '✈️'
     }
 ] as const;
 
@@ -28,43 +38,76 @@ export type SidePermissionField =
     typeof SIDE_PERMISSION_FIELDS[number]['field'];
 
 export function buildSidePermissionsPanel(player: PlayerInfo) {
-    const rows = SIDE_PERMISSION_FIELDS.map(({ field, label }) => {
-        const currentValue = Number(player[field] ?? 0);
+    const greenPermissions = SIDE_PERMISSION_FIELDS.filter(
+        item => item.side === 'green'
+    );
 
-        const menu = new StringSelectMenuBuilder()
-            .setCustomId(`save_side_permission:${player.pUID}:${field}`)
-            .setPlaceholder(label)
-            .addOptions(
-                {
-                    label: 'Нет допуска',
-                    value: '0',
-                    default: currentValue === 0
-                },
-                {
-                    label: 'Есть допуск',
-                    value: '1',
-                    default: currentValue === 1
-                }
-            );
+    const bluePermissions = SIDE_PERMISSION_FIELDS.filter(
+        item => item.side === 'blue'
+    );
 
-        return new ActionRowBuilder<StringSelectMenuBuilder>()
-            .addComponents(menu);
-    });
+    const formatPermissions = (
+        permissions: typeof SIDE_PERMISSION_FIELDS[number][]
+    ) => {
+        return permissions.map(({ field, label, emoji }) => {
+            const enabled = Number(player[field]) === 1;
 
-    const status = SIDE_PERMISSION_FIELDS.map(({ field, label }) => {
-        const value = Number(player[field] ?? 0);
+            return `${emoji} **${label}:** ${
+                enabled ? '✅ Есть допуск' : '❌ Нет допуска'
+            }`;
+        }).join('\n');
+    };
 
-        return `**${label}:** ${
-            value === 1 ? '✅ Есть допуск' : '❌ Нет допуска'
-        }`;
-    }).join('\n');
+    const embed = new EmbedBuilder()
+        .setColor(0x2b2d31)
+        .setTitle('🛡️ Управление допусками')
+        .setDescription(
+            `**Игрок:** ${player.pName}\n` +
+            `**Steam ID:** \`${player.pUID}\`\n` +
+            `**Discord:** ${player.DiscID ? `<@${player.DiscID}>` : 'Не привязан'}`
+        )
+        .addFields(
+            {
+                name: '🟢 Зелёная сторона',
+                value: formatPermissions(greenPermissions),
+                inline: true
+            },
+            {
+                name: '🔵 Синяя сторона',
+                value: formatPermissions(bluePermissions),
+                inline: true
+            }
+        )
+        .setFooter({
+            text: 'Нажмите кнопку, чтобы изменить соответствующий допуск'
+        });
+
+    const buttons = SIDE_PERMISSION_FIELDS.map(
+        ({ field, label, emoji }) => {
+            const enabled = Number(player[field]) === 1;
+            const nextValue = enabled ? 0 : 1;
+
+            return new ButtonBuilder()
+                .setCustomId(
+                    `sideperm:${player.pUID}:${field}:${nextValue}`
+                )
+                .setLabel(
+                    `${label} · ${enabled ? 'Снять' : 'Выдать'}`
+                )
+                .setEmoji(emoji)
+                .setStyle(
+                    enabled
+                        ? ButtonStyle.Danger
+                        : ButtonStyle.Success
+                );
+        }
+    );
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(buttons);
 
     return {
-        content:
-            `🛡️ **Допуски сторон игрока: ${player.pName}**\n\n` +
-            `${status}\n\n` +
-            'Выберите новое значение в нужном списке:',
-
-        components: rows
+        embeds: [embed],
+        components: [row]
     };
 }

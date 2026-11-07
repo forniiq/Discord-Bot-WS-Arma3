@@ -18,13 +18,11 @@ import { requireOperator } from '@/utils/operator.utils';
 
 const handler: EventHandler<'interactionCreate'> = async (interaction) => {
     if (
-        !interaction.isStringSelectMenu() ||
-        !interaction.customId.startsWith('save_side_permission:')
+        !interaction.isButton() ||
+        !interaction.customId.startsWith('sideperm:')
     ) {
         return;
     }
-
-    if (!interaction.guild) return;
 
     if (!(await requireOperator(interaction.user.id))) {
         return void interaction.reply({
@@ -33,26 +31,22 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         });
     }
 
-    const [, pUID, field] = interaction.customId.split(':');
+    const [, pUID, field, rawValue] = interaction.customId.split(':');
 
-    if (
-        !pUID ||
-        !SIDE_PERMISSION_FIELDS.some(item => item.field === field)
-    ) {
+    const permission = SIDE_PERMISSION_FIELDS.find(
+        item => item.field === field
+    );
+
+    if (!rawValue) return;
+
+    if (!pUID || !permission || !['0', '1'].includes(rawValue)) {
         return void interaction.reply({
-            content: '❌ Некорректное поле допуска.',
+            content: '❌ Некорректные параметры изменения допуска.',
             flags: MessageFlags.Ephemeral
         });
     }
 
-    const value = Number(interaction.values[0]);
-
-    if (value !== 0 && value !== 1) {
-        return void interaction.reply({
-            content: '❌ Допустимые значения: 0 или 1.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
+    const value = Number(rawValue);
 
     const player = await findPlayer({
         steamId: pUID
@@ -73,7 +67,7 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
 
     if (!saved) {
         return void interaction.reply({
-            content: '❌ Не удалось сохранить допуск в базе данных.',
+            content: '❌ Не удалось сохранить изменения.',
             flags: MessageFlags.Ephemeral
         });
     }
@@ -89,18 +83,14 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         });
     }
 
-    const permission = SIDE_PERMISSION_FIELDS.find(
-        item => item.field === field
-    );
-
-    const status = value === 1 ? 'выдан' : 'снят';
+    const action = value === 1 ? 'выдал' : 'снял';
 
     await sendLog(
         'INFO',
         'AdminEdit',
-        `Администратор \`${interaction.user.tag}\` ${status} ` +
-        `допуск **${permission?.label ?? field}** игроку ` +
-        `\`${updatedPlayer.pName}\` (pUID: ${pUID})`
+        `Администратор \`${interaction.user.tag}\` ${action} ` +
+        `допуск **${permission.label} (${permission.side === 'green' ? 'Зелёная сторона' : 'Синяя сторона'})** ` +
+        `игроку \`${updatedPlayer.pName}\` (pUID: ${pUID})`
     );
 
     return void interaction.update(
