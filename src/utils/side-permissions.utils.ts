@@ -38,26 +38,6 @@ export type SidePermissionField =
     typeof SIDE_PERMISSION_FIELDS[number]['field'];
 
 export function buildSidePermissionsPanel(player: PlayerInfo) {
-    const greenPermissions = SIDE_PERMISSION_FIELDS.filter(
-        item => item.side === 'green'
-    );
-
-    const bluePermissions = SIDE_PERMISSION_FIELDS.filter(
-        item => item.side === 'blue'
-    );
-
-    const formatPermissions = (
-        permissions: typeof SIDE_PERMISSION_FIELDS[number][]
-    ) => {
-        return permissions.map(({ field, label, emoji }) => {
-            const enabled = Number(player[field]) === 1;
-
-            return `${emoji} **${label}:** ${
-                enabled ? '✅ Есть допуск' : '❌ Нет допуска'
-            }`;
-        }).join('\n');
-    };
-
     const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setTitle('🛡️ Управление допусками')
@@ -68,46 +48,56 @@ export function buildSidePermissionsPanel(player: PlayerInfo) {
         )
         .addFields(
             {
-                name: '🟢 Зелёная сторона',
-                value: formatPermissions(greenPermissions),
-                inline: true
+                name: '🟢 ЗЕЛЁНАЯ СТОРОНА',
+                value:
+                    `${formatPermission(player.pIND_BTV, '🚜 БТВ')}\n` +
+                    `${formatPermission(player.pIND_CYP, '✈️ ВВС')}`,
+                inline: false
             },
             {
-                name: '🔵 Синяя сторона',
-                value: formatPermissions(bluePermissions),
-                inline: true
+                name: '🔵 СИНЯЯ СТОРОНА',
+                value:
+                    `${formatPermission(player.pBLU_BTV, '🚜 БТВ')}\n` +
+                    `${formatPermission(player.pBLU_CYP, '✈️ ВВС')}`,
+                inline: false
             }
         )
         .setFooter({
-            text: 'Нажмите кнопку, чтобы изменить соответствующий допуск'
+            text: 'Кнопки сгруппированы по соответствующим сторонам'
         });
 
-    const buttons = SIDE_PERMISSION_FIELDS.map(
-        ({ field, label, emoji }) => {
-            const enabled = Number(player[field]) === 1;
-            const nextValue = enabled ? 0 : 1;
+    const greenButtons = SIDE_PERMISSION_FIELDS
+        .filter(item => item.side === 'green')
+        .map(item => createPermissionButton(player, item));
 
-            return new ButtonBuilder()
-                .setCustomId(
-                    `sideperm:${player.pUID}:${field}:${nextValue}`
-                )
-                .setLabel(
-                    `${label} · ${enabled ? 'Снять' : 'Выдать'}`
-                )
-                .setEmoji(emoji)
-                .setStyle(
-                    enabled
-                        ? ButtonStyle.Danger
-                        : ButtonStyle.Success
-                );
-        }
-    );
-
-    const row = new ActionRowBuilder<ButtonBuilder>()
-        .addComponents(buttons);
+    const blueButtons = SIDE_PERMISSION_FIELDS
+        .filter(item => item.side === 'blue')
+        .map(item => createPermissionButton(player, item));
 
     return {
         embeds: [embed],
-        components: [row]
+        components: [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(greenButtons),
+            new ActionRowBuilder<ButtonBuilder>().addComponents(blueButtons)
+        ]
     };
+}
+
+function formatPermission(value: number, label: string): string {
+    return `${label}: ${Number(value) === 1 ? '✅ Есть допуск' : '❌ Нет допуска'}`;
+}
+
+function createPermissionButton(
+    player: PlayerInfo,
+    permission: typeof SIDE_PERMISSION_FIELDS[number]
+): ButtonBuilder {
+    const enabled = Number(player[permission.field]) === 1;
+
+    return new ButtonBuilder()
+        .setCustomId(
+            `sideperm:${player.pUID}:${permission.field}:${enabled ? 0 : 1}`
+        )
+        .setLabel(`${permission.label} · ${enabled ? 'Снять' : 'Выдать'}`)
+        .setEmoji(permission.emoji)
+        .setStyle(enabled ? ButtonStyle.Danger : ButtonStyle.Success);
 }
