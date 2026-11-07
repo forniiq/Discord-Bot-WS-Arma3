@@ -18,6 +18,10 @@ export interface PlayerInfo {
     pTitle: string;
     pAdmin: string;
     pTime: string;
+    pIND_BTV: number;
+    pIND_CYP: number;
+    pBLU_BTV: number;
+    pBLU_CYP: number;
 }
 
 export interface OnlinePlayer {
