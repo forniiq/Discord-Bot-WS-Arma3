@@ -10,6 +10,8 @@ import {
 import {
     SIDE_PERMISSION_FIELDS,
     buildSidePermissionsPanel,
+    buildSidePermissionEditor,
+    type PermissionSide,
     type SidePermissionField
 } from '@/utils/side-permissions.utils';
 
@@ -31,22 +33,17 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         });
     }
 
-    const [, pUID, field, rawValue] = interaction.customId.split(':');
+    const parts = interaction.customId.split(':');
 
-    const permission = SIDE_PERMISSION_FIELDS.find(
-        item => item.field === field
-    );
+    const action = parts[1];
+    const pUID = parts[2];
 
-    if (!rawValue) return;
-
-    if (!pUID || !permission || !['0', '1'].includes(rawValue)) {
+    if (!action || !pUID) {
         return void interaction.reply({
-            content: '❌ Некорректные параметры изменения допуска.',
+            content: '❌ Некорректные параметры взаимодействия.',
             flags: MessageFlags.Ephemeral
         });
     }
-
-    const value = Number(rawValue);
 
     const player = await findPlayer({
         steamId: pUID
@@ -59,43 +56,99 @@ const handler: EventHandler<'interactionCreate'> = async (interaction) => {
         });
     }
 
-    const saved = await updatePlayerField(
-        pUID,
-        field as SidePermissionField,
-        value
-    );
+    // Открытие редактора выбранной стороны
+    if (action === 'open') {
+        const side = parts[3];
 
-    if (!saved) {
-        return void interaction.reply({
-            content: '❌ Не удалось сохранить изменения.',
-            flags: MessageFlags.Ephemeral
-        });
+        if (side !== 'green' && side !== 'blue') {
+            return void interaction.reply({
+                content: '❌ Неизвестная сторона.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        return void interaction.update(
+            buildSidePermissionEditor(player, side)
+        );
     }
 
-    const updatedPlayer = await findPlayer({
-        steamId: pUID
+    // Возврат к стартовой панели
+    if (action === 'back') {
+        return void interaction.update(
+            buildSidePermissionsPanel(player)
+        );
+    }
+
+    // Изменение допуска
+    if (action === 'set') {
+        const field = parts[3];
+        const rawValue = parts[4];
+
+        const permission = SIDE_PERMISSION_FIELDS.find(
+            item => item.field === field
+        );
+
+        if (
+            !permission ||
+            !rawValue ||
+            !['0', '1'].includes(rawValue)
+        ) {
+            return void interaction.reply({
+                content: '❌ Некорректные параметры изменения допуска.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const value = Number(rawValue);
+
+        const saved = await updatePlayerField(
+            pUID,
+            permission.field as SidePermissionField,
+            value
+        );
+
+        if (!saved) {
+            return void interaction.reply({
+                content: '❌ Не удалось сохранить изменения.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const updatedPlayer = await findPlayer({
+            steamId: pUID
+        });
+
+        if (!updatedPlayer) {
+            return void interaction.reply({
+                content: '⚠️ Допуск сохранён, но профиль не удалось загрузить.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const actionText = value === 1 ? 'выдал' : 'снял';
+
+        const sideName: Record<PermissionSide, string> = {
+            green: 'Зелёная сторона',
+            blue: 'Синяя сторона'
+        };
+
+        await sendLog(
+            'INFO',
+            'AdminEdit',
+            `Администратор \`${interaction.user.tag}\` ${actionText} ` +
+            `допуск **${permission.label} (${sideName[permission.side]})** ` +
+            `игроку \`${updatedPlayer.pName}\` (pUID: ${pUID})`
+        );
+
+        return void interaction.update(
+            buildSidePermissionEditor(updatedPlayer, permission.side)
+        );
+    }
+
+    return void interaction.reply({
+        content: '❌ Неизвестное действие.',
+        flags: MessageFlags.Ephemeral
     });
-
-    if (!updatedPlayer) {
-        return void interaction.reply({
-            content: '⚠️ Допуск сохранён, но профиль не удалось загрузить.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    const action = value === 1 ? 'выдал' : 'снял';
-
-    await sendLog(
-        'INFO',
-        'AdminEdit',
-        `Администратор \`${interaction.user.tag}\` ${action} ` +
-        `допуск **${permission.label} (${permission.side === 'green' ? 'Зелёная сторона' : 'Синяя сторона'})** ` +
-        `игроку \`${updatedPlayer.pName}\` (pUID: ${pUID})`
-    );
-
-    return void interaction.update(
-        buildSidePermissionsPanel(updatedPlayer)
-    );
 };
 
 export default handler;
